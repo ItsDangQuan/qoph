@@ -198,13 +198,6 @@ impl<'a> RegexParser<'a> {
 
         while let Some(&c) = self.chars.peek() {
             if c == ']' {
-                if ranges.is_empty() {
-                    return Err(RegexParserError::new(
-                        RegexParserErrorKind::EmptyCharClass,
-                        self.current_location(),
-                    ));
-                }
-
                 self.consume();
                 let end_loc = self.current_location();
 
@@ -467,20 +460,6 @@ mod tests {
             }
             other => panic!("expected character class, got {other:?}"),
         }
-    }
-
-    #[test]
-    fn reports_empty_character_class() {
-        let error = parse_err("[]");
-        assert_eq!(error.kind(), &RegexParserErrorKind::EmptyCharClass);
-        assert_eq!(error.location(), Location::new(1, 2));
-    }
-
-    #[test]
-    fn reports_empty_negated_character_class() {
-        let error = parse_err("[^]");
-        assert_eq!(error.kind(), &RegexParserErrorKind::EmptyCharClass);
-        assert_eq!(error.location(), Location::new(1, 3));
     }
 
     #[test]

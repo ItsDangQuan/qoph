@@ -11,8 +11,6 @@ pub enum RegexParserErrorKind {
     UnclosedGrouping,
     /// A character class was opened but not closed.
     UnclosedCharClass,
-    /// A character class without any item.
-    EmptyCharClass,
     /// A character range had the wrong ordering.
     InvalidCharRange { start: char, end: char },
     /// A backslash appeared at the end of the input.
@@ -63,9 +61,6 @@ impl fmt::Display for RegexParserError {
             }
             RegexParserErrorKind::UnclosedCharClass => {
                 write!(f, "Unclosed character class, expected ']'")
-            }
-            RegexParserErrorKind::EmptyCharClass => {
-                write!(f, "Empty character class")
             }
             RegexParserErrorKind::InvalidCharRange { start, end } => {
                 write!(f, "Invalid character range: {}-{}", start, end)
