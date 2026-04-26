@@ -30,8 +30,6 @@ impl RustEmitter {
 
     fn emit_headers(&self, out: &mut String) -> Result<(), fmt::Error> {
         writeln!(out, "// AUTO-GENERATED LEXER")?;
-        writeln!(out, "#![allow(dead_code)]")?;
-        writeln!(out, "#![allow(unused_imports)]")?;
         writeln!(out)?;
         Ok(())
     }
@@ -267,8 +265,8 @@ mod tests {
         let source = emit_source("A ::= a");
 
         assert!(source.contains("// AUTO-GENERATED LEXER"));
-        assert!(source.contains("#![allow(dead_code)]"));
-        assert!(source.contains("#![allow(unused_imports)]"));
+        assert!(!source.contains("#![allow(dead_code)]"));
+        assert!(!source.contains("#![allow(unused_imports)]"));
     }
 
     #[test]
