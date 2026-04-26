@@ -136,3 +136,84 @@ impl<'a> DfaBuilder<'a> {
         best_match
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use crate::lexer::metadata::TokenMetadata;
+    use crate::lexer::nfa::NfaBuilder;
+    use crate::lexer::regex::RegexParser;
+
+    use super::super::core::{Dfa, DfaState};
+    use super::DfaBuilder;
+
+    fn parse_regex(input: &str) -> crate::lexer::regex::RegexAst {
+        let mut parser = RegexParser::new(input);
+        parser.parse().expect("regex should parse")
+    }
+
+    fn build_single_rule_dfa(regex: &str, metadata: TokenMetadata) -> Dfa {
+        let ast = parse_regex(regex);
+        let mut builder = NfaBuilder::new();
+        builder.add_rule(&ast, metadata);
+        let nfa = builder.build();
+
+        DfaBuilder::new(&nfa).build()
+    }
+
+    fn run_dfa(dfa: &Dfa, input: &[u8]) -> Option<TokenMetadata> {
+        let mut state = dfa.start;
+        for &byte in input {
+            match dfa.states[state].transitions[byte as usize] {
+                Some(next) => state = next,
+                None => return None,
+            }
+        }
+        dfa.states[state].accept
+    }
+
+    #[test]
+    fn dfa_builder_accepts_exact_literal() {
+        let dfa = build_single_rule_dfa("ab", TokenMetadata::new(0, 9));
+
+        assert_eq!(run_dfa(&dfa, b"ab"), Some(TokenMetadata::new(0, 9)));
+        assert_eq!(run_dfa(&dfa, b"a"), None);
+        assert_eq!(run_dfa(&dfa, b"abc"), None);
+    }
+
+    #[test]
+    fn dfa_builder_chooses_lowest_priority_acceptance() {
+        let ast = parse_regex("a");
+        let mut nfa_builder = NfaBuilder::new();
+        nfa_builder.add_rule(&ast, TokenMetadata::new(10, 1));
+        nfa_builder.add_rule(&ast, TokenMetadata::new(1, 2));
+        let nfa = nfa_builder.build();
+
+        let dfa = DfaBuilder::new(&nfa).build();
+        assert_eq!(run_dfa(&dfa, b"a"), Some(TokenMetadata::new(1, 2)));
+    }
+
+    #[test]
+    fn dfa_builder_handles_multiple_branches() {
+        let ast = parse_regex("a|b");
+        let mut nfa_builder = NfaBuilder::new();
+        nfa_builder.add_rule(&ast, TokenMetadata::new(0, 1));
+        let nfa = nfa_builder.build();
+
+        let dfa = DfaBuilder::new(&nfa).build();
+        assert_eq!(run_dfa(&dfa, b"a"), Some(TokenMetadata::new(0, 1)));
+        assert_eq!(run_dfa(&dfa, b"b"), Some(TokenMetadata::new(0, 1)));
+    }
+
+    #[test]
+    fn dfa_builder_rejects_unmatched_input() {
+        let dfa = build_single_rule_dfa("ab", TokenMetadata::new(0, 9));
+        assert_eq!(run_dfa(&dfa, b"ac"), None);
+    }
+
+    #[test]
+    fn core_state_can_be_manually_assembled_for_testing() {
+        let mut state = DfaState::new();
+        state.transitions[b'a' as usize] = Some(1);
+        assert_eq!(state.transitions[b'a' as usize], Some(1));
+    }
+}

@@ -157,3 +157,50 @@ impl DfaOptimizer {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use crate::lexer::metadata::TokenMetadata;
+
+    use super::super::core::{Dfa, DfaState};
+    use super::DfaOptimizer;
+
+    #[test]
+    fn optimizer_merges_equivalent_non_accepting_states() {
+        let mut s0 = DfaState::new();
+        s0.transitions[b'a' as usize] = Some(1);
+        s0.transitions[b'b' as usize] = Some(2);
+
+        let s1 = DfaState::new();
+        let s2 = DfaState::new();
+
+        let dfa = Dfa {
+            states: vec![s0, s1, s2],
+            start: 0,
+        };
+
+        let minimized = DfaOptimizer::new(dfa).optimize();
+        assert_eq!(minimized.states.len(), 2);
+    }
+
+    #[test]
+    fn optimizer_keeps_accepting_states_with_different_ids_separate() {
+        let mut s0 = DfaState::new();
+        s0.transitions[b'a' as usize] = Some(1);
+        s0.transitions[b'b' as usize] = Some(2);
+
+        let mut s1 = DfaState::new();
+        s1.accept = Some(TokenMetadata::new(0, 11));
+
+        let mut s2 = DfaState::new();
+        s2.accept = Some(TokenMetadata::new(0, 12));
+
+        let dfa = Dfa {
+            states: vec![s0, s1, s2],
+            start: 0,
+        };
+
+        let minimized = DfaOptimizer::new(dfa).optimize();
+        assert_eq!(minimized.states.len(), 3);
+    }
+}
