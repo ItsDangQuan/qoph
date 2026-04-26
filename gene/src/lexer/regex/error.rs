@@ -32,11 +32,13 @@ impl RegexParserError {
         Self { kind, location }
     }
 
+    #[allow(unused)]
     /// Returns the error kind.
     pub fn kind(&self) -> &RegexParserErrorKind {
         &self.kind
     }
 
+    #[allow(unused)]
     /// Returns the source location at which the error was reported.
     pub fn location(&self) -> Location {
         self.location

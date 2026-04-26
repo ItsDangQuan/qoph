@@ -8,7 +8,7 @@ pub(crate) enum Transition {
 }
 
 pub(crate) struct NfaState {
-    pub(crate) transition: Transition,
+    pub(super) transition: Transition,
 }
 
 impl NfaState {
@@ -18,8 +18,8 @@ impl NfaState {
 }
 
 pub(crate) struct Nfa {
-    pub(crate) states: Vec<NfaState>,
-    pub(crate) start: usize,
+    pub(super) states: Vec<NfaState>,
+    pub(super) start: usize,
 }
 
 impl Nfa {

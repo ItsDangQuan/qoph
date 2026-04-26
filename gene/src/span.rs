@@ -37,11 +37,13 @@ impl Span {
         Self { start, end }
     }
 
+    #[allow(unused)]
     /// Returns the start location.
     pub fn start(&self) -> Location {
         self.start
     }
 
+    #[allow(unused)]
     /// Returns the end location.
     pub fn end(&self) -> Location {
         self.end

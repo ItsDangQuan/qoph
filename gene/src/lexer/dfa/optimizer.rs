@@ -2,18 +2,18 @@ use std::collections::{BTreeMap, BTreeSet, VecDeque};
 
 use super::core::{Dfa, DfaState};
 
-pub(super) struct DfaOptimizer {
+pub(crate) struct DfaOptimizer {
     dfa: Dfa,
     num_states: usize,
 }
 
 impl DfaOptimizer {
-    pub(super) fn new(dfa: Dfa) -> Self {
+    pub(crate) fn new(dfa: Dfa) -> Self {
         let num_states = dfa.states.len();
         Self { dfa, num_states }
     }
 
-    pub(super) fn optimize(self) -> Dfa {
+    pub(crate) fn optimize(self) -> Dfa {
         if self.num_states == 0 {
             return self.dfa;
         }
@@ -71,6 +71,7 @@ impl DfaOptimizer {
         while let Some(splitter_idx) = worklist.pop_front() {
             in_worklist[splitter_idx] = false;
 
+            #[allow(clippy::needless_range_loop)]
             for byte in 0..=255 {
                 let mut incoming_states: BTreeSet<usize> = BTreeSet::new();
                 for &state in &partitions[splitter_idx] {
@@ -106,10 +107,7 @@ impl DfaOptimizer {
                         state_to_partition[state] = new_p_idx;
                     }
 
-                    if in_worklist[p_idx] {
-                        worklist.push_back(new_p_idx);
-                        in_worklist[new_p_idx] = true;
-                    } else if p1.len() <= p2.len() {
+                    if in_worklist[p_idx] || p1.len() <= p2.len() {
                         worklist.push_back(new_p_idx);
                         in_worklist[new_p_idx] = true;
                     } else {

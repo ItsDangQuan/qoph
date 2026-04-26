@@ -2,14 +2,14 @@
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 /// Per-rule metadata propagated from the lexer definition into automata.
-pub(super) struct TokenMetadata {
+pub(crate) struct TokenMetadata {
     priority: usize,
     id: usize,
 }
 
 impl TokenMetadata {
     /// Creates new token metadata.
-    pub(super) fn new(priority: usize, id: usize) -> Self {
+    pub(crate) fn new(priority: usize, id: usize) -> Self {
         Self { priority, id }
     }
 
@@ -19,7 +19,7 @@ impl TokenMetadata {
     }
 
     /// Returns the rule identifier.
-    pub(super) fn id(&self) -> usize {
+    pub(crate) fn id(&self) -> usize {
         self.id
     }
 }

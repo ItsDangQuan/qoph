@@ -1,23 +1,18 @@
-use crate::{
-    lexer::regex::RegexParser,
-    span::Location,
-};
+use crate::{lexer::regex::RegexParser, span::Location};
 
 use super::ast::{LexerDefinition, LexerRule, PayloadType};
-use super::error::{
-    DefinitionParserError, DefinitionParserErrorKind, DefinitionParserResult,
-};
+use super::error::{DefinitionParserError, DefinitionParserErrorKind, DefinitionParserResult};
 
-struct DefinitionParser<'a> {
+pub(crate) struct DefinitionParser<'a> {
     input: &'a str,
 }
 
 impl<'a> DefinitionParser<'a> {
-    pub(super) fn new(input: &'a str) -> Self {
+    pub(crate) fn new(input: &'a str) -> Self {
         Self { input }
     }
 
-    pub(super) fn parse(&self) -> DefinitionParserResult<LexerDefinition> {
+    pub(crate) fn parse(&self) -> DefinitionParserResult<LexerDefinition> {
         let mut rules = Vec::new();
         let mut priority = 0;
 
@@ -242,21 +237,30 @@ mod tests {
     #[test]
     fn reports_empty_regex_at_regex_start_column() {
         let error = parse_err("Ident ::=    ");
-        assert!(matches!(error.kind(), DefinitionParserErrorKind::EmptyRegex));
+        assert!(matches!(
+            error.kind(),
+            DefinitionParserErrorKind::EmptyRegex
+        ));
         assert_eq!(error.location(), Location::new(1, 14));
     }
 
     #[test]
     fn reports_empty_category() {
         let error = parse_err("   ::= a");
-        assert!(matches!(error.kind(), DefinitionParserErrorKind::EmptyCategory));
+        assert!(matches!(
+            error.kind(),
+            DefinitionParserErrorKind::EmptyCategory
+        ));
         assert_eq!(error.location(), Location::new(1, 4));
     }
 
     #[test]
     fn reports_unclosed_payload() {
         let error = parse_err("Ident(str ::= a");
-        assert!(matches!(error.kind(), DefinitionParserErrorKind::UnclosedPayload));
+        assert!(matches!(
+            error.kind(),
+            DefinitionParserErrorKind::UnclosedPayload
+        ));
     }
 
     #[test]

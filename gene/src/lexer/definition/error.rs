@@ -15,7 +15,7 @@ pub(super) enum DefinitionParserErrorKind {
 }
 
 #[derive(Debug)]
-pub(super) struct DefinitionParserError {
+pub(crate) struct DefinitionParserError {
     kind: DefinitionParserErrorKind,
     location: Location,
 }
@@ -25,10 +25,12 @@ impl DefinitionParserError {
         Self { kind, location }
     }
 
+    #[allow(unused)]
     pub(super) fn kind(&self) -> &DefinitionParserErrorKind {
         &self.kind
     }
 
+    #[allow(unused)]
     pub(super) fn location(&self) -> Location {
         self.location
     }
@@ -95,7 +97,10 @@ mod tests {
             Location::new(3, 8),
         );
 
-        assert!(matches!(err.kind(), DefinitionParserErrorKind::MissingDelimiter));
+        assert!(matches!(
+            err.kind(),
+            DefinitionParserErrorKind::MissingDelimiter
+        ));
         assert_eq!(err.location(), Location::new(3, 8));
     }
 }

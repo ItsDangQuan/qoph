@@ -6,14 +6,14 @@ use crate::lexer::nfa::{Nfa, Transition};
 use super::bitset::BitSet;
 use super::core::{Dfa, DfaState};
 
-pub(super) struct DfaBuilder<'a> {
+pub(crate) struct DfaBuilder<'a> {
     nfa: &'a Nfa,
     num_nfa_states: usize,
     bitset_words: usize,
 }
 
 impl<'a> DfaBuilder<'a> {
-    pub(super) fn new(nfa: &'a Nfa) -> Self {
+    pub(crate) fn new(nfa: &'a Nfa) -> Self {
         let num_nfa_states = nfa.states().len();
         Self {
             nfa,
@@ -22,7 +22,7 @@ impl<'a> DfaBuilder<'a> {
         }
     }
 
-    pub(super) fn build(self) -> Dfa {
+    pub(crate) fn build(self) -> Dfa {
         let mut dfa_states = Vec::new();
         let mut state_mapping = BTreeMap::new();
         let mut unmarked = Vec::new();

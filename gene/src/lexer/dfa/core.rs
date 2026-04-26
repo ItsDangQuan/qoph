@@ -1,6 +1,6 @@
 use crate::lexer::metadata::TokenMetadata;
 
-pub(super) struct DfaState {
+pub(crate) struct DfaState {
     pub(super) transitions: [Option<usize>; 256],
     pub(super) accept: Option<TokenMetadata>,
 }
@@ -12,9 +12,27 @@ impl DfaState {
             accept: None,
         }
     }
+
+    pub(crate) fn transitions(&self) -> &[Option<usize>; 256] {
+        &self.transitions
+    }
+
+    pub(crate) fn accept(&self) -> Option<TokenMetadata> {
+        self.accept
+    }
 }
 
-pub(super) struct Dfa {
+pub(crate) struct Dfa {
     pub(super) states: Vec<DfaState>,
     pub(super) start: usize,
+}
+
+impl Dfa {
+    pub(crate) fn states(&self) -> &[DfaState] {
+        &self.states
+    }
+
+    pub(crate) fn start(&self) -> usize {
+        self.start
+    }
 }

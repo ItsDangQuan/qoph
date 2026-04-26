@@ -1,13 +1,13 @@
 use crate::lexer::regex::RegexAst;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub(super) enum PayloadType {
+pub(crate) enum PayloadType {
     None,
     StringSlice,
 }
 
 #[derive(Debug)]
-pub(super) struct LexerRule {
+pub(crate) struct LexerRule {
     ast: RegexAst,
     variant_name: String,
     payload: PayloadType,
@@ -29,25 +29,25 @@ impl LexerRule {
         }
     }
 
-    pub(super) fn ast(&self) -> &RegexAst {
+    pub(crate) fn ast(&self) -> &RegexAst {
         &self.ast
     }
 
-    pub(super) fn variant_name(&self) -> &str {
+    pub(crate) fn variant_name(&self) -> &str {
         &self.variant_name
     }
 
-    pub(super) fn payload(&self) -> &PayloadType {
+    pub(crate) fn payload(&self) -> &PayloadType {
         &self.payload
     }
 
-    pub(super) fn priority(&self) -> usize {
+    pub(crate) fn priority(&self) -> usize {
         self.priority
     }
 }
 
 #[derive(Debug)]
-pub(super) struct LexerDefinition {
+pub(crate) struct LexerDefinition {
     rules: Vec<LexerRule>,
 }
 
@@ -56,7 +56,7 @@ impl LexerDefinition {
         Self { rules }
     }
 
-    pub(super) fn rules(&self) -> &[LexerRule] {
+    pub(crate) fn rules(&self) -> &[LexerRule] {
         &self.rules
     }
 }

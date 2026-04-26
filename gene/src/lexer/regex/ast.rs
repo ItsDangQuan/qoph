@@ -143,6 +143,7 @@ impl RegexAst {
         &self.kind
     }
 
+    #[allow(unused)]
     /// Returns the source span for this node.
     pub fn span(&self) -> Span {
         self.span

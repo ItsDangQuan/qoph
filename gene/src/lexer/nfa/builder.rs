@@ -245,7 +245,10 @@ mod tests {
         builder.add_rule(&ast, TokenMetadata::new(0, 0));
         let nfa = builder.build();
 
-        assert!(matches!(nfa.states()[nfa.start()].transition(), Transition::DeadEnd));
+        assert!(matches!(
+            nfa.states()[nfa.start()].transition(),
+            Transition::DeadEnd
+        ));
     }
 
     #[test]

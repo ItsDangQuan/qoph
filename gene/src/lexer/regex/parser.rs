@@ -14,6 +14,7 @@ pub struct RegexParser<'a> {
 }
 
 impl<'a> RegexParser<'a> {
+    #[allow(unused)]
     /// Creates a parser over the supplied input.
     pub fn new(input: &'a str) -> Self {
         Self {
