@@ -24,12 +24,13 @@ impl RustEmitter {
         self.emit_tables(&mut out)?;
         self.emit_lexer_struct(&mut out)?;
         self.emit_iterator(&mut out)?;
-        todo!()
+
+        Ok(out)
     }
 
     fn emit_headers(&self, out: &mut String) -> Result<(), fmt::Error> {
         writeln!(out, "// AUTO-GENERATED LEXER")?;
-        writeln!(out, "#![allow(dead_code)")?;
+        writeln!(out, "#![allow(dead_code)]")?;
         writeln!(out, "#![allow(unused_imports)]")?;
         writeln!(out)?;
         Ok(())
@@ -57,6 +58,7 @@ impl RustEmitter {
 
     fn emit_tables(&self, out: &mut String) -> Result<(), fmt::Error> {
         let num_states = self.dfa.states().len();
+        let table_size = num_states + 1;
         let eq_classes = EquivalenceClasses::compute(&self.dfa);
 
         writeln!(out, "const CLASS_MAP: [u8; 256] = [")?;
@@ -73,8 +75,11 @@ impl RustEmitter {
         writeln!(
             out,
             "const TRANSITIONS: [[u16; {}]; {}] = [",
-            eq_classes.num_classes, num_states
+            eq_classes.num_classes, table_size
         )?;
+
+        writeln!(out, "    [0; {}],", eq_classes.num_classes)?;
+
         for state_transitions in eq_classes.compressed_transitions {
             write!(out, "    [")?;
             for (i, &target) in state_transitions.iter().enumerate() {
@@ -87,7 +92,8 @@ impl RustEmitter {
         }
         writeln!(out, "];\n")?;
 
-        writeln!(out, "const ACCEPT: [Option<u16>; {}] = [", num_states)?;
+        writeln!(out, "const ACCEPT: [Option<u16>; {}] = [", table_size)?;
+        writeln!(out, "    None,")?;
         for state in self.dfa.states() {
             match state.accept() {
                 Some(metadata) => writeln!(out, "    Some({}),", metadata.id())?,
@@ -146,7 +152,7 @@ impl RustEmitter {
         writeln!(
             out,
             "        let mut current_state: u16 = {};",
-            self.dfa.start()
+            self.dfa.start() + 1
         )?;
         writeln!(out, "        let mut last_accept_state = None;")?;
         writeln!(out, "        let mut last_accept_cursor = self.cursor;")?;
@@ -223,5 +229,63 @@ impl RustEmitter {
         writeln!(out, "    }}")?;
         writeln!(out, "}}")?;
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::lexer::{
+        definition::DefinitionParser,
+        dfa::{DfaBuilder, DfaOptimizer},
+        metadata::TokenMetadata,
+        nfa::NfaBuilder,
+    };
+
+    use super::RustEmitter;
+
+    fn emit_source(spec: &str) -> String {
+        let definition = DefinitionParser::new(spec)
+            .parse()
+            .expect("definition should parse");
+
+        let mut nfa_builder = NfaBuilder::new();
+        for (id, rule) in definition.rules().iter().enumerate() {
+            nfa_builder.add_rule(rule.ast(), TokenMetadata::new(rule.priority(), id));
+        }
+
+        let nfa = nfa_builder.build();
+        let dfa = DfaBuilder::new(&nfa).build();
+        let dfa = DfaOptimizer::new(dfa).optimize();
+
+        RustEmitter::new(definition, dfa)
+            .emit()
+            .expect("emission should succeed")
+    }
+
+    #[test]
+    fn emit_includes_valid_headers() {
+        let source = emit_source("A ::= a");
+
+        assert!(source.contains("// AUTO-GENERATED LEXER"));
+        assert!(source.contains("#![allow(dead_code)]"));
+        assert!(source.contains("#![allow(unused_imports)]"));
+    }
+
+    #[test]
+    fn emit_reserves_zero_dead_row_and_shifts_start_state() {
+        let source = emit_source("A ::= a");
+
+        assert!(source.contains("[0; "));
+        assert!(source.contains("let mut current_state: u16 = 1;"));
+    }
+
+    #[test]
+    fn emit_generates_token_variants_for_payload_and_non_payload_rules() {
+        let source = emit_source("A ::= a\nB(str) ::= b+");
+
+        assert!(source.contains("A,"));
+        assert!(source.contains("B(&'a str),"));
+        assert!(source.contains("Token::A"));
+        assert!(source.contains("Token::B(slice)"));
     }
 }

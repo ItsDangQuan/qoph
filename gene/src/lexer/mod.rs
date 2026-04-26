@@ -1,4 +1,11 @@
 //! Lexer-definition parsing and generation internals.
+//!
+//! Pipeline overview:
+//! 1. Parse the textual lexer definition into rule ASTs.
+//! 2. Build one NFA branch per rule and merge them into a master NFA.
+//! 3. Convert the NFA to a DFA via subset construction.
+//! 4. Minimize the DFA.
+//! 5. Emit standalone Rust source for a table-driven lexer.
 
 use std::error::Error;
 
@@ -18,6 +25,15 @@ mod nfa;
 mod regex;
 
 /// Generates lexer source code from a lexer specification.
+///
+/// Each non-empty, non-comment line in `input` is parsed as:
+///
+/// `TokenName[(str)] ::= <regex>`
+///
+/// where `TokenName` is the emitted enum variant and `(str)` enables
+/// a `&str` payload for that token variant.
+///
+/// Returns an error when definition parsing or regex parsing fails.
 pub fn generate_lexer_source(input: &str) -> Result<String, Box<dyn Error>> {
     let definition_parser = DefinitionParser::new(input);
     let definition = definition_parser.parse()?;
