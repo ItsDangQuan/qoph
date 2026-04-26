@@ -1,160 +1,102 @@
 //! DFA construction for lexer rules.
 
 mod bitset;
+mod builder;
+mod core;
+mod optimizer;
 
-use std::collections::BTreeMap;
+#[cfg(test)]
+mod tests {
+    use crate::lexer::metadata::TokenMetadata;
+    use crate::lexer::nfa::NfaBuilder;
+    use crate::lexer::regex::RegexParser;
 
-use crate::lexer::metadata::TokenMetadata;
-use crate::lexer::nfa::{Nfa, Transition};
+    use super::builder::DfaBuilder;
+    use super::core::{Dfa, DfaState};
+    use super::optimizer::DfaOptimizer;
 
-use self::bitset::BitSet;
-
-struct DfaState {
-    transitions: [Option<usize>; 256],
-    accept: Option<TokenMetadata>,
-}
-
-impl DfaState {
-    fn new() -> Self {
-        Self {
-            transitions: [None; 256],
-            accept: None,
-        }
-    }
-}
-
-pub struct Dfa {
-    states: Vec<DfaState>,
-    start: usize,
-}
-
-pub struct DfaBuilder<'a> {
-    nfa: &'a Nfa,
-    num_nfa_states: usize,
-    bitset_words: usize,
-}
-
-impl<'a> DfaBuilder<'a> {
-    pub fn new(nfa: &'a Nfa) -> Self {
-        let num_nfa_states = nfa.states().len();
-        Self {
-            nfa,
-            num_nfa_states,
-            bitset_words: num_nfa_states.div_ceil(64),
-        }
+    fn parse_regex(input: &str) -> crate::lexer::regex::RegexAst {
+        let mut parser = RegexParser::new(input);
+        parser.parse().expect("regex should parse")
     }
 
-    pub fn build(self) -> Dfa {
-        let mut dfa_states = Vec::new();
-        let mut state_mapping = BTreeMap::new();
-        let mut unmarked = Vec::new();
+    fn build_single_rule_dfa(regex: &str, metadata: TokenMetadata) -> Dfa {
+        let ast = parse_regex(regex);
+        let mut builder = NfaBuilder::new();
+        builder.add_rule(&ast, metadata);
+        let nfa = builder.build();
 
-        let start_subset = self.compute_epsilon_closure(&[self.nfa.start()]);
-        let start_dfa_idx = 0;
+        DfaBuilder::new(&nfa).build()
+    }
 
-        state_mapping.insert(start_subset.clone(), start_dfa_idx);
-        unmarked.push(start_subset.clone());
-
-        let mut start_dfa_state = DfaState::new();
-        start_dfa_state.accept = self.resolve_acceptance(&start_subset);
-        dfa_states.push(start_dfa_state);
-
-        while let Some(current_subset) = unmarked.pop() {
-            let current_dfa_idx = *state_mapping.get(&current_subset).unwrap();
-
-            for byte in 0..=255 {
-                let mut move_targets = Vec::new();
-
-                for nfa_idx in 0..self.num_nfa_states {
-                    if current_subset.test(nfa_idx)
-                        && let &Transition::MatchRange(start_b, end_b, target) =
-                            self.nfa.states()[nfa_idx].transition()
-                        && byte >= start_b
-                        && byte <= end_b
-                    {
-                        move_targets.push(target);
-                    }
-                }
-
-                if move_targets.is_empty() {
-                    continue;
-                }
-
-                let next_subset = self.compute_epsilon_closure(&move_targets);
-
-                let next_dfa_idx = *state_mapping.entry(next_subset.clone()).or_insert_with(|| {
-                    let new_idx = dfa_states.len();
-
-                    let mut new_dfa_state = DfaState::new();
-                    new_dfa_state.accept = self.resolve_acceptance(&next_subset);
-
-                    dfa_states.push(new_dfa_state);
-                    unmarked.push(next_subset);
-
-                    new_idx
-                });
-
-                dfa_states[current_dfa_idx].transitions[byte as usize] = Some(next_dfa_idx);
+    fn run_dfa(dfa: &Dfa, input: &[u8]) -> Option<TokenMetadata> {
+        let mut state = dfa.start;
+        for &byte in input {
+            match dfa.states[state].transitions[byte as usize] {
+                Some(next) => state = next,
+                None => return None,
             }
         }
-
-        Dfa {
-            states: dfa_states,
-            start: start_dfa_idx,
-        }
+        dfa.states[state].accept
     }
 
-    fn compute_epsilon_closure(&self, initial_states: &[usize]) -> BitSet {
-        let mut closure = BitSet::new(self.bitset_words);
-        let mut stack = Vec::with_capacity(initial_states.len());
-        let mut visited = vec![false; self.num_nfa_states];
+    #[test]
+    fn dfa_builder_accepts_exact_literal() {
+        let dfa = build_single_rule_dfa("ab", TokenMetadata::new(0, 9));
 
-        for &state in initial_states {
-            stack.push(state);
-            visited[state] = true;
-            closure.set(state);
-        }
-
-        while let Some(current) = stack.pop() {
-            if let &Transition::Epsilon(target1, target2_opt) =
-                self.nfa.states()[current].transition()
-            {
-                if !visited[target1] {
-                    visited[target1] = true;
-                    stack.push(target1);
-                    closure.set(target1);
-                }
-                if let Some(target2) = target2_opt
-                    && !visited[target2]
-                {
-                    visited[target2] = true;
-                    stack.push(target2);
-                    closure.set(target2);
-                }
-            }
-        }
-
-        closure
+        assert_eq!(run_dfa(&dfa, b"ab"), Some(TokenMetadata::new(0, 9)));
+        assert_eq!(run_dfa(&dfa, b"a"), None);
+        assert_eq!(run_dfa(&dfa, b"abc"), None);
     }
 
-    fn resolve_acceptance(&self, subset: &BitSet) -> Option<TokenMetadata> {
-        let mut best_match = None;
+    #[test]
+    fn dfa_builder_chooses_lowest_priority_acceptance() {
+        let ast = parse_regex("a");
+        let mut nfa_builder = NfaBuilder::new();
+        nfa_builder.add_rule(&ast, TokenMetadata::new(10, 1));
+        nfa_builder.add_rule(&ast, TokenMetadata::new(1, 2));
+        let nfa = nfa_builder.build();
 
-        for nfa_idx in 0..self.num_nfa_states {
-            if subset.test(nfa_idx)
-                && let &Transition::Accept(metadata) = self.nfa.states()[nfa_idx].transition()
-            {
-                match best_match {
-                    None => best_match = Some(metadata),
-                    Some(existing) => {
-                        if metadata.priority() < existing.priority() {
-                            best_match = Some(metadata);
-                        }
-                    }
-                }
-            }
-        }
+        let dfa = DfaBuilder::new(&nfa).build();
+        assert_eq!(run_dfa(&dfa, b"a"), Some(TokenMetadata::new(1, 2)));
+    }
 
-        best_match
+    #[test]
+    fn optimizer_merges_equivalent_non_accepting_states() {
+        let mut s0 = DfaState::new();
+        s0.transitions[b'a' as usize] = Some(1);
+        s0.transitions[b'b' as usize] = Some(2);
+
+        let s1 = DfaState::new();
+        let s2 = DfaState::new();
+
+        let dfa = Dfa {
+            states: vec![s0, s1, s2],
+            start: 0,
+        };
+
+        let minimized = DfaOptimizer::new(dfa).optimize();
+        assert_eq!(minimized.states.len(), 2);
+    }
+
+    #[test]
+    fn optimizer_keeps_accepting_states_with_different_ids_separate() {
+        let mut s0 = DfaState::new();
+        s0.transitions[b'a' as usize] = Some(1);
+        s0.transitions[b'b' as usize] = Some(2);
+
+        let mut s1 = DfaState::new();
+        s1.accept = Some(TokenMetadata::new(0, 11));
+
+        let mut s2 = DfaState::new();
+        s2.accept = Some(TokenMetadata::new(0, 12));
+
+        let dfa = Dfa {
+            states: vec![s0, s1, s2],
+            start: 0,
+        };
+
+        let minimized = DfaOptimizer::new(dfa).optimize();
+        assert_eq!(minimized.states.len(), 3);
     }
 }

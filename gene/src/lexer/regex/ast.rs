@@ -148,3 +148,47 @@ impl RegexAst {
         self.span
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use std::ops::RangeInclusive;
+
+    use crate::span::{Location, Span};
+
+    use super::{CharSet, RegexAst, RegexAstKind};
+
+    fn as_pairs(ranges: &[RangeInclusive<char>]) -> Vec<(char, char)> {
+        ranges.iter().map(|r| (*r.start(), *r.end())).collect()
+    }
+
+    #[test]
+    fn charset_new_merges_overlapping_and_adjacent_ranges() {
+        let set = CharSet::new(vec!['d'..='f', 'a'..='c', 'g'..='g', 'x'..='z']);
+        assert_eq!(as_pairs(set.ranges()), vec![('a', 'g'), ('x', 'z')]);
+    }
+
+    #[test]
+    fn charset_complement_excludes_newline() {
+        let set = CharSet::new(vec!['a'..='a']);
+        let complement = set.complement();
+
+        assert!(!complement.ranges().iter().any(|r| r.contains(&'\n')));
+        assert!(complement.ranges().iter().any(|r| r.contains(&'b')));
+    }
+
+    #[test]
+    fn charset_complement_of_full_unicode_is_empty() {
+        let full = CharSet::new(vec!['\u{0000}'..='\u{10FFFF}']);
+        let complement = full.complement();
+        assert!(complement.ranges().is_empty());
+    }
+
+    #[test]
+    fn regex_ast_accessors_return_original_values() {
+        let span = Span::new(Location::new(1, 2), Location::new(1, 3));
+        let ast = RegexAst::new(RegexAstKind::Literal('x'), span);
+
+        assert!(matches!(ast.kind(), RegexAstKind::Literal('x')));
+        assert_eq!(ast.span(), span);
+    }
+}

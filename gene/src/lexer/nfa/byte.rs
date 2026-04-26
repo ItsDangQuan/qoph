@@ -103,3 +103,45 @@ fn expand_byte_sequences(
         expand_byte_sequences(&min_suffix, &end[1..], prefix_end, seqs);
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::{utf8_expand, wildcard_sequences};
+
+    #[test]
+    fn wildcard_ascii_ranges_exclude_newline() {
+        let has_newline = wildcard_sequences()
+            .iter()
+            .filter(|seq| seq.len() == 1)
+            .any(|seq| {
+                let (s, e) = seq[0];
+                s <= b'\n' && b'\n' <= e
+            });
+
+        assert!(!has_newline);
+    }
+
+    #[test]
+    fn utf8_expand_single_ascii_char_is_single_byte_sequence() {
+        let expanded = utf8_expand('A', 'A');
+        assert_eq!(expanded, vec![vec![(b'A', b'A')]]);
+    }
+
+    #[test]
+    fn utf8_expand_across_ascii_boundary_produces_mixed_width_sequences() {
+        let expanded = utf8_expand('\u{007F}', '\u{0080}');
+
+        assert!(expanded.iter().any(|seq| seq == &vec![(0x7F, 0x7F)]));
+        assert!(expanded
+            .iter()
+            .any(|seq| seq == &vec![(0xC2, 0xC2), (0x80, 0x80)]));
+    }
+
+    #[test]
+    fn utf8_expand_skips_surrogate_hole() {
+        let expanded = utf8_expand('\u{D7FF}', '\u{E000}');
+
+        assert!(expanded.iter().any(|seq| seq == &vec![(0xED, 0xED), (0x9F, 0x9F), (0xBF, 0xBF)]));
+        assert!(expanded.iter().any(|seq| seq == &vec![(0xEE, 0xEE), (0x80, 0x80), (0x80, 0x80)]));
+    }
+}

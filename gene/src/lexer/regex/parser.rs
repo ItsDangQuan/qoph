@@ -23,6 +23,15 @@ impl<'a> RegexParser<'a> {
         }
     }
 
+    /// Creates a parser over the supplied input, starting at a specific absolute location.
+    pub fn with_location(input: &'a str, start_location: Location) -> Self {
+        Self {
+            chars: input.chars().peekable(),
+            current_line: start_location.line(),
+            current_column: start_location.column(),
+        }
+    }
+
     /// Returns the parser's current 1-based source location.
     fn current_location(&self) -> Location {
         Location::new(self.current_line, self.current_column)

@@ -19,7 +19,6 @@ mod ast;
 mod error;
 mod parser;
 
-pub use ast::{CharSet, RegexAst, RegexAstKind};
-pub use error::{RegexParserError, RegexParserErrorKind, RegexParserResult};
-#[allow(unused_imports)]
-pub use parser::RegexParser;
+pub(super) use ast::{CharSet, RegexAst, RegexAstKind};
+pub(super) use error::{RegexParserError, RegexParserErrorKind, RegexParserResult};
+pub(super) use parser::RegexParser;

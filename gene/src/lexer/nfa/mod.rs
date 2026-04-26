@@ -7,45 +7,45 @@ use crate::lexer::regex::{RegexAst, RegexAstKind};
 
 use self::byte::{utf8_expand, wildcard_sequences};
 
-pub enum Transition {
+pub(super) enum Transition {
     Epsilon(usize, Option<usize>),
     MatchRange(u8, u8, usize),
     Accept(TokenMetadata),
     DeadEnd,
 }
 
-pub struct NfaState {
+pub(super) struct NfaState {
     transition: Transition,
 }
 
 impl NfaState {
-    pub fn transition(&self) -> &Transition {
+    pub(super) fn transition(&self) -> &Transition {
         &self.transition
     }
 }
 
-pub struct Nfa {
+pub(super) struct Nfa {
     states: Vec<NfaState>,
     start: usize,
 }
 
 impl Nfa {
-    pub fn states(&self) -> &[NfaState] {
+    pub(super) fn states(&self) -> &[NfaState] {
         &self.states
     }
 
-    pub fn start(&self) -> usize {
+    pub(super) fn start(&self) -> usize {
         self.start
     }
 }
 
-pub struct NfaBuilder {
+pub(super) struct NfaBuilder {
     states: Vec<NfaState>,
     rule_entry_points: Vec<usize>,
 }
 
 impl NfaBuilder {
-    pub fn new() -> Self {
+    pub(super) fn new() -> Self {
         Self {
             states: Vec::new(),
             rule_entry_points: Vec::new(),
@@ -58,12 +58,12 @@ impl NfaBuilder {
         index
     }
 
-    pub fn add_rule(&mut self, ast: &RegexAst, metadata: TokenMetadata) {
+    pub(super) fn add_rule(&mut self, ast: &RegexAst, metadata: TokenMetadata) {
         let (start, _) = self.build_recursive(ast.kind(), metadata);
         self.rule_entry_points.push(start);
     }
 
-    pub fn build(mut self) -> Nfa {
+    pub(super) fn build(mut self) -> Nfa {
         if self.rule_entry_points.is_empty() {
             panic!("cannot build a lexer NFA with zero rules");
         }
@@ -229,5 +229,73 @@ impl NfaBuilder {
         }
 
         targets[0]
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::lexer::metadata::TokenMetadata;
+    use crate::lexer::regex::RegexParser;
+
+    use super::{NfaBuilder, Transition};
+
+    fn parse_regex(input: &str) -> crate::lexer::regex::RegexAst {
+        let mut parser = RegexParser::new(input);
+        parser.parse().expect("regex should parse")
+    }
+
+    #[test]
+    fn build_panics_when_no_rules_are_added() {
+        let result = std::panic::catch_unwind(|| NfaBuilder::new().build());
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn literal_rule_emits_match_then_accept_with_metadata() {
+        let ast = parse_regex("a");
+        let metadata = TokenMetadata::new(0, 42);
+
+        let mut builder = NfaBuilder::new();
+        builder.add_rule(&ast, metadata);
+        let nfa = builder.build();
+
+        let start = nfa.start();
+        match nfa.states()[start].transition() {
+            Transition::MatchRange(s, e, next) => {
+                assert_eq!((*s, *e), (b'a', b'a'));
+                match nfa.states()[*next].transition() {
+                    Transition::Accept(m) => assert_eq!(*m, metadata),
+                    _ => panic!("expected accept state"),
+                }
+            }
+            _ => panic!("expected start match-range state"),
+        }
+    }
+
+    #[test]
+    fn empty_character_class_becomes_dead_end_start() {
+        let ast = parse_regex("[]");
+
+        let mut builder = NfaBuilder::new();
+        builder.add_rule(&ast, TokenMetadata::new(0, 0));
+        let nfa = builder.build();
+
+        assert!(matches!(nfa.states()[nfa.start()].transition(), Transition::DeadEnd));
+    }
+
+    #[test]
+    fn multiple_rules_create_master_epsilon_start() {
+        let a = parse_regex("a");
+        let b = parse_regex("b");
+
+        let mut builder = NfaBuilder::new();
+        builder.add_rule(&a, TokenMetadata::new(0, 0));
+        builder.add_rule(&b, TokenMetadata::new(1, 1));
+
+        let nfa = builder.build();
+        assert!(matches!(
+            nfa.states()[nfa.start()].transition(),
+            Transition::Epsilon(_, Some(_))
+        ));
     }
 }

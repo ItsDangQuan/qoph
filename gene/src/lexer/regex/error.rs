@@ -79,3 +79,72 @@ impl Error for RegexParserError {}
 
 /// The result type used throughout the regex parser.
 pub type RegexParserResult<T> = Result<T, RegexParserError>;
+
+#[cfg(test)]
+mod tests {
+    use std::error::Error;
+
+    use crate::span::Location;
+
+    use super::{RegexParserError, RegexParserErrorKind};
+
+    fn assert_is_error_trait<E: Error>() {}
+
+    #[test]
+    fn accessors_return_constructor_data() {
+        let err = RegexParserError::new(
+            RegexParserErrorKind::UnexpectedChar('x'),
+            Location::new(3, 7),
+        );
+        assert!(matches!(
+            err.kind(),
+            RegexParserErrorKind::UnexpectedChar('x')
+        ));
+        assert_eq!(err.location(), Location::new(3, 7));
+    }
+
+    #[test]
+    fn display_formats_all_error_variants() {
+        let cases = vec![
+            (
+                RegexParserErrorKind::UnexpectedEof,
+                "Unexpected end of input",
+            ),
+            (
+                RegexParserErrorKind::UnclosedGrouping,
+                "Unclosed grouping, expected ')'",
+            ),
+            (
+                RegexParserErrorKind::UnclosedCharClass,
+                "Unclosed character class, expected ']'",
+            ),
+            (
+                RegexParserErrorKind::InvalidCharRange {
+                    start: 'z',
+                    end: 'a',
+                },
+                "Invalid character range: z-a",
+            ),
+            (
+                RegexParserErrorKind::TrailingBackslash,
+                "Trailing backslash '\\' with no escaped character",
+            ),
+            (
+                RegexParserErrorKind::UnexpectedChar('!'),
+                "Unexpected character '!'",
+            ),
+        ];
+
+        for (kind, tail) in cases {
+            let err = RegexParserError::new(kind, Location::new(2, 9));
+            let msg = err.to_string();
+            assert!(msg.starts_with("Parse error at line 2, column 9: "));
+            assert!(msg.contains(tail));
+        }
+    }
+
+    #[test]
+    fn type_implements_std_error() {
+        assert_is_error_trait::<RegexParserError>();
+    }
+}
