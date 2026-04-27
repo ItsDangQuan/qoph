@@ -25,10 +25,12 @@ impl DefinitionParserError {
         Self { kind, location }
     }
 
+    #[allow(dead_code)]
     pub(super) fn kind(&self) -> &DefinitionParserErrorKind {
         &self.kind
     }
 
+    #[allow(dead_code)]
     pub(super) fn location(&self) -> usize {
         self.location
     }

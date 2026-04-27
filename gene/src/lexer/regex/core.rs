@@ -1,5 +1,3 @@
-use std::ops::Range;
-
 use super::char_set::CharSet;
 
 #[derive(Debug, Clone, PartialEq)]

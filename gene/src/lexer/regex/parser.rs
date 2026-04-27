@@ -228,7 +228,7 @@ impl<'a> RegexParser<'a> {
                 span: loc..self.current_location(),
             }),
             Some(c) if matches!(c, ']' | '-') => Err(RegexParserError {
-                kind: RegexParserErrorKind::UnescapedMetaChar(c),
+                kind: RegexParserErrorKind::UnescapedClassMetaChar(c),
                 span: loc..self.current_location(),
             }),
             Some(c) => Ok(c),
@@ -237,5 +237,251 @@ impl<'a> RegexParser<'a> {
                 span: loc..self.current_location(),
             }),
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn parse_ok(input: &str) -> RegexAst {
+        RegexParser::new(input, 0)
+            .parse()
+            .expect("regex should parse")
+    }
+
+    fn parse_err(input: &str) -> RegexParserError {
+        RegexParser::new(input, 0)
+            .parse()
+            .expect_err("regex should fail")
+    }
+
+    fn literal(ast: &RegexAst) -> char {
+        match ast {
+            RegexAst::Literal(c) => *c,
+            other => panic!("expected literal, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn parses_single_literal() {
+        assert_eq!(literal(&parse_ok("a")), 'a');
+    }
+
+    #[test]
+    fn parses_unicode_literal() {
+        assert_eq!(literal(&parse_ok("é")), 'é');
+    }
+
+    #[test]
+    fn parses_wildcard() {
+        assert!(matches!(parse_ok("."), RegexAst::Wildcard));
+    }
+
+    #[test]
+    fn parses_basic_escapes() {
+        assert_eq!(literal(&parse_ok("\\n")), '\n');
+        assert_eq!(literal(&parse_ok("\\t")), '\t');
+        assert_eq!(literal(&parse_ok("\\r")), '\r');
+    }
+
+    #[test]
+    fn parses_escaped_meta_chars_as_literals() {
+        for pattern in [
+            "\\*", "\\+", "\\?", "\\|", "\\(", "\\)", "\\[", "\\]", "\\.", "\\\\",
+        ] {
+            assert!(matches!(parse_ok(pattern), RegexAst::Literal(_)));
+        }
+    }
+
+    #[test]
+    fn alternation_is_left_associative() {
+        let ast = parse_ok("a|b|c");
+        match ast {
+            RegexAst::Alternation(left, right) => {
+                assert_eq!(literal(&right), 'c');
+                match *left {
+                    RegexAst::Alternation(inner_left, inner_right) => {
+                        assert_eq!(literal(&inner_left), 'a');
+                        assert_eq!(literal(&inner_right), 'b');
+                    }
+                    other => panic!("expected nested alternation, got {other:?}"),
+                }
+            }
+            other => panic!("expected alternation, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn concatenation_binds_tighter_than_alternation() {
+        let ast = parse_ok("ab|c");
+        match ast {
+            RegexAst::Alternation(left, right) => {
+                assert_eq!(literal(&right), 'c');
+                match *left {
+                    RegexAst::Concatenation(inner_left, inner_right) => {
+                        assert_eq!(literal(&inner_left), 'a');
+                        assert_eq!(literal(&inner_right), 'b');
+                    }
+                    other => panic!("expected concatenation, got {other:?}"),
+                }
+            }
+            other => panic!("expected alternation, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn parses_closure_operators() {
+        assert!(matches!(parse_ok("a*"), RegexAst::KleeneClosure(_)));
+        assert!(matches!(parse_ok("a+"), RegexAst::PositiveClosure(_)));
+        assert!(matches!(parse_ok("a?"), RegexAst::OptionalClosure(_)));
+    }
+
+    #[test]
+    fn grouped_expression_parses() {
+        let ast = parse_ok("(ab)c");
+        match ast {
+            RegexAst::Concatenation(left, right) => {
+                assert!(matches!(*left, RegexAst::Concatenation(_, _)));
+                assert_eq!(literal(&right), 'c');
+            }
+            other => panic!("expected concatenation, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn parses_character_class_and_range() {
+        let ast = parse_ok("[a-cx]");
+        match ast {
+            RegexAst::CharacterClass(set) => {
+                assert_eq!(set.ranges().len(), 2);
+                assert_eq!(set.ranges()[0], 'a'..='c');
+                assert_eq!(set.ranges()[1], 'x'..='x');
+            }
+            other => panic!("expected class, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn parses_negated_character_class() {
+        assert!(matches!(parse_ok("[^a-z]"), RegexAst::ComplementClass(_)));
+    }
+
+    #[test]
+    fn escaped_right_bracket_works_globally() {
+        assert_eq!(literal(&parse_ok("\\]")), ']');
+    }
+
+    #[test]
+    fn unescaped_right_bracket_fails_globally() {
+        let err = parse_err("]");
+        assert_eq!(err.kind, RegexParserErrorKind::UnescapedMetaChar(']'));
+        assert_eq!(err.span, 0..1);
+    }
+
+    #[test]
+    fn escaped_right_bracket_works_in_class() {
+        let ast = parse_ok("[\\]]");
+        match ast {
+            RegexAst::CharacterClass(set) => {
+                assert_eq!(set.ranges().len(), 1);
+                assert_eq!(set.ranges()[0], ']'..=']');
+            }
+            other => panic!("expected class, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn escaped_hyphen_works_in_class() {
+        let ast = parse_ok("[\\-]");
+        match ast {
+            RegexAst::CharacterClass(set) => {
+                assert_eq!(set.ranges().len(), 1);
+                assert_eq!(set.ranges()[0], '-'..='-');
+            }
+            other => panic!("expected class, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn unescaped_hyphen_fails_at_class_start() {
+        let err = parse_err("[-a]");
+        assert_eq!(err.kind, RegexParserErrorKind::UnescapedClassMetaChar('-'));
+        assert_eq!(err.span, 1..2);
+    }
+
+    #[test]
+    fn unescaped_hyphen_fails_at_class_end() {
+        let err = parse_err("[a-]");
+        assert_eq!(err.kind, RegexParserErrorKind::UnescapedClassMetaChar(']'));
+        assert_eq!(err.span, 3..4);
+    }
+
+    #[test]
+    fn unescaped_right_bracket_cannot_be_class_data() {
+        let err = parse_err("[a-]]");
+        assert_eq!(err.kind, RegexParserErrorKind::UnescapedClassMetaChar(']'));
+        assert_eq!(err.span, 3..4);
+    }
+
+    #[test]
+    fn invalid_reversed_range_reports_error() {
+        let err = parse_err("[z-a]");
+        assert_eq!(
+            err.kind,
+            RegexParserErrorKind::InvalidCharRange {
+                start: 'z',
+                end: 'a',
+            }
+        );
+    }
+
+    #[test]
+    fn trailing_backslash_reports_error() {
+        let err = parse_err("\\");
+        assert_eq!(err.kind, RegexParserErrorKind::TrailingBackslash);
+        assert_eq!(err.span, 0..1);
+    }
+
+    #[test]
+    fn trailing_backslash_in_class_reports_error() {
+        let err = parse_err("[a\\");
+        assert_eq!(err.kind, RegexParserErrorKind::TrailingBackslash);
+        assert_eq!(err.span, 2..3);
+    }
+
+    #[test]
+    fn unclosed_group_reports_error() {
+        let err = parse_err("(ab");
+        assert_eq!(err.kind, RegexParserErrorKind::UnclosedGrouping);
+    }
+
+    #[test]
+    fn unclosed_class_reports_error() {
+        let err = parse_err("[ab");
+        assert_eq!(err.kind, RegexParserErrorKind::UnclosedCharClass);
+    }
+
+    #[test]
+    fn unescaped_operator_reports_error() {
+        let err = parse_err("*");
+        assert_eq!(err.kind, RegexParserErrorKind::UnescapedMetaChar('*'));
+        assert_eq!(err.span, 0..1);
+    }
+
+    #[test]
+    fn unexpected_trailing_chars_reports_error() {
+        let err = parse_err("a)");
+        assert_eq!(err.kind, RegexParserErrorKind::UnexpectedTrailingChars);
+        assert_eq!(err.span, 1..2);
+    }
+
+    #[test]
+    fn offsets_are_applied_to_error_spans() {
+        let err = RegexParser::new("]", 10)
+            .parse()
+            .expect_err("regex should fail");
+        assert_eq!(err.kind, RegexParserErrorKind::UnescapedMetaChar(']'));
+        assert_eq!(err.span, 10..11);
     }
 }

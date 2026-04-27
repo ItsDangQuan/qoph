@@ -58,7 +58,7 @@ impl<'a> DefinitionParser<'a> {
 
             let (variant_name, payload) = Self::parse_category(left_side, category_loc)?;
 
-            let mut regex_parser = RegexParser::new(regex_str, regex_loc);
+            let regex_parser = RegexParser::new(regex_str, regex_loc);
             let ast = match regex_parser.parse() {
                 Ok(ast) => ast,
                 Err(e) => {

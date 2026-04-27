@@ -145,7 +145,7 @@ mod tests {
     use super::DfaBuilder;
 
     fn parse_regex(input: &str) -> crate::lexer::regex::RegexAst {
-        let mut parser = RegexParser::new(input, 0);
+        let parser = RegexParser::new(input, 0);
         parser.parse().expect("regex should parse")
     }
 
