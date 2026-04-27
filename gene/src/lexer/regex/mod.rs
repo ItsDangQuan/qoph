@@ -19,6 +19,6 @@ mod ast;
 mod error;
 mod parser;
 
-pub(super) use ast::{CharSet, RegexAst, RegexAstKind};
-pub(super) use error::{RegexParserError, RegexParserErrorKind, RegexParserResult};
-pub(super) use parser::RegexParser;
+pub(crate) use ast::{RegexAst, RegexAstKind};
+pub(crate) use error::RegexParserError;
+pub(crate) use parser::RegexParser;

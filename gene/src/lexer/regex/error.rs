@@ -1,7 +1,5 @@
 use std::{error::Error, fmt};
 
-use crate::span::Location;
-
 #[derive(Debug, Clone, PartialEq)]
 /// The error categories emitted by the regex parser.
 pub enum RegexParserErrorKind {
@@ -23,12 +21,12 @@ pub enum RegexParserErrorKind {
 /// A parse error with location information.
 pub struct RegexParserError {
     kind: RegexParserErrorKind,
-    location: Location,
+    location: usize,
 }
 
 impl RegexParserError {
     /// Creates a new parse error.
-    pub fn new(kind: RegexParserErrorKind, location: Location) -> Self {
+    pub fn new(kind: RegexParserErrorKind, location: usize) -> Self {
         Self { kind, location }
     }
 
@@ -39,20 +37,15 @@ impl RegexParserError {
     }
 
     #[allow(unused)]
-    /// Returns the source location at which the error was reported.
-    pub fn location(&self) -> Location {
+    /// Returns the byte offset at which the error was reported.
+    pub fn location(&self) -> usize {
         self.location
     }
 }
 
 impl fmt::Display for RegexParserError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(
-            f,
-            "Parse error at line {}, column {}: ",
-            self.location.line(),
-            self.location.column()
-        )?;
+        write!(f, "Parse error at byte {}: ", self.location)?;
 
         match &self.kind {
             RegexParserErrorKind::UnexpectedEof => {
@@ -86,23 +79,18 @@ pub type RegexParserResult<T> = Result<T, RegexParserError>;
 mod tests {
     use std::error::Error;
 
-    use crate::span::Location;
-
     use super::{RegexParserError, RegexParserErrorKind};
 
     fn assert_is_error_trait<E: Error>() {}
 
     #[test]
     fn accessors_return_constructor_data() {
-        let err = RegexParserError::new(
-            RegexParserErrorKind::UnexpectedChar('x'),
-            Location::new(3, 7),
-        );
+        let err = RegexParserError::new(RegexParserErrorKind::UnexpectedChar('x'), 7);
         assert!(matches!(
             err.kind(),
             RegexParserErrorKind::UnexpectedChar('x')
         ));
-        assert_eq!(err.location(), Location::new(3, 7));
+        assert_eq!(err.location(), 7);
     }
 
     #[test]
@@ -138,9 +126,9 @@ mod tests {
         ];
 
         for (kind, tail) in cases {
-            let err = RegexParserError::new(kind, Location::new(2, 9));
+            let err = RegexParserError::new(kind, 9);
             let msg = err.to_string();
-            assert!(msg.starts_with("Parse error at line 2, column 9: "));
+            assert!(msg.starts_with("Parse error at byte 9: "));
             assert!(msg.contains(tail));
         }
     }

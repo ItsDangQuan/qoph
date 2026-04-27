@@ -14,7 +14,7 @@ pub(crate) struct DfaBuilder<'a> {
 
 impl<'a> DfaBuilder<'a> {
     pub(crate) fn new(nfa: &'a Nfa) -> Self {
-        let num_nfa_states = nfa.states().len();
+        let num_nfa_states = nfa.states.len();
         Self {
             nfa,
             num_nfa_states,
@@ -27,7 +27,7 @@ impl<'a> DfaBuilder<'a> {
         let mut state_mapping = BTreeMap::new();
         let mut unmarked = Vec::new();
 
-        let start_subset = self.compute_epsilon_closure(&[self.nfa.start()]);
+        let start_subset = self.compute_epsilon_closure(&[self.nfa.start]);
         let start_dfa_idx = 0;
 
         state_mapping.insert(start_subset.clone(), start_dfa_idx);
@@ -45,8 +45,8 @@ impl<'a> DfaBuilder<'a> {
 
                 for nfa_idx in 0..self.num_nfa_states {
                     if current_subset.test(nfa_idx)
-                        && let &Transition::MatchRange(start_b, end_b, target) =
-                            self.nfa.states()[nfa_idx].transition()
+                        && let Transition::MatchRange(start_b, end_b, target) =
+                            self.nfa.states[nfa_idx].transition
                         && byte >= start_b
                         && byte <= end_b
                     {
@@ -94,9 +94,7 @@ impl<'a> DfaBuilder<'a> {
         }
 
         while let Some(current) = stack.pop() {
-            if let &Transition::Epsilon(target1, target2_opt) =
-                self.nfa.states()[current].transition()
-            {
+            if let Transition::Epsilon(target1, target2_opt) = self.nfa.states[current].transition {
                 if !visited[target1] {
                     visited[target1] = true;
                     stack.push(target1);
@@ -120,12 +118,12 @@ impl<'a> DfaBuilder<'a> {
 
         for nfa_idx in 0..self.num_nfa_states {
             if subset.test(nfa_idx)
-                && let &Transition::Accept(metadata) = self.nfa.states()[nfa_idx].transition()
+                && let Transition::Accept(metadata) = self.nfa.states[nfa_idx].transition
             {
                 match best_match {
                     None => best_match = Some(metadata),
                     Some(existing) => {
-                        if metadata.priority() < existing.priority() {
+                        if metadata.priority < existing.priority {
                             best_match = Some(metadata);
                         }
                     }
@@ -173,9 +171,12 @@ mod tests {
 
     #[test]
     fn dfa_builder_accepts_exact_literal() {
-        let dfa = build_single_rule_dfa("ab", TokenMetadata::new(0, 9));
+        let dfa = build_single_rule_dfa("ab", TokenMetadata { priority: 0, id: 9 });
 
-        assert_eq!(run_dfa(&dfa, b"ab"), Some(TokenMetadata::new(0, 9)));
+        assert_eq!(
+            run_dfa(&dfa, b"ab"),
+            Some(TokenMetadata { priority: 0, id: 9 })
+        );
         assert_eq!(run_dfa(&dfa, b"a"), None);
         assert_eq!(run_dfa(&dfa, b"abc"), None);
     }
@@ -184,29 +185,44 @@ mod tests {
     fn dfa_builder_chooses_lowest_priority_acceptance() {
         let ast = parse_regex("a");
         let mut nfa_builder = NfaBuilder::new();
-        nfa_builder.add_rule(&ast, TokenMetadata::new(10, 1));
-        nfa_builder.add_rule(&ast, TokenMetadata::new(1, 2));
+        nfa_builder.add_rule(
+            &ast,
+            TokenMetadata {
+                priority: 10,
+                id: 1,
+            },
+        );
+        nfa_builder.add_rule(&ast, TokenMetadata { priority: 1, id: 2 });
         let nfa = nfa_builder.build();
 
         let dfa = DfaBuilder::new(&nfa).build();
-        assert_eq!(run_dfa(&dfa, b"a"), Some(TokenMetadata::new(1, 2)));
+        assert_eq!(
+            run_dfa(&dfa, b"a"),
+            Some(TokenMetadata { priority: 1, id: 2 })
+        );
     }
 
     #[test]
     fn dfa_builder_handles_multiple_branches() {
         let ast = parse_regex("a|b");
         let mut nfa_builder = NfaBuilder::new();
-        nfa_builder.add_rule(&ast, TokenMetadata::new(0, 1));
+        nfa_builder.add_rule(&ast, TokenMetadata { priority: 0, id: 1 });
         let nfa = nfa_builder.build();
 
         let dfa = DfaBuilder::new(&nfa).build();
-        assert_eq!(run_dfa(&dfa, b"a"), Some(TokenMetadata::new(0, 1)));
-        assert_eq!(run_dfa(&dfa, b"b"), Some(TokenMetadata::new(0, 1)));
+        assert_eq!(
+            run_dfa(&dfa, b"a"),
+            Some(TokenMetadata { priority: 0, id: 1 })
+        );
+        assert_eq!(
+            run_dfa(&dfa, b"b"),
+            Some(TokenMetadata { priority: 0, id: 1 })
+        );
     }
 
     #[test]
     fn dfa_builder_rejects_unmatched_input() {
-        let dfa = build_single_rule_dfa("ab", TokenMetadata::new(0, 9));
+        let dfa = build_single_rule_dfa("ab", TokenMetadata { priority: 0, id: 9 });
         assert_eq!(run_dfa(&dfa, b"ac"), None);
     }
 

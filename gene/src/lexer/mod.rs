@@ -40,9 +40,12 @@ pub fn generate_lexer_source(input: &str) -> Result<String, Box<dyn Error>> {
 
     let mut nfa_builder = NfaBuilder::new();
 
-    for (id, rule) in definition.rules().iter().enumerate() {
-        let metadata = TokenMetadata::new(rule.priority(), id);
-        nfa_builder.add_rule(rule.ast(), metadata);
+    for (id, rule) in definition.rules.iter().enumerate() {
+        let metadata = TokenMetadata {
+            priority: rule.priority,
+            id,
+        };
+        nfa_builder.add_rule(&rule.ast, metadata);
     }
 
     let master_nfa = nfa_builder.build();

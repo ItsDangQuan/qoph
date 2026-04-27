@@ -1,16 +1,14 @@
-use std::ops::RangeInclusive;
-
-use crate::span::Span;
+use std::ops::{Range, RangeInclusive};
 
 #[derive(Debug, Clone, PartialEq)]
 /// A normalized set of character ranges used by character classes.
-pub struct CharSet {
+pub(crate) struct CharSet {
     ranges: Vec<RangeInclusive<char>>,
 }
 
 impl CharSet {
     /// Creates a character set and merges overlapping or adjacent ranges.
-    pub fn new(mut ranges: Vec<RangeInclusive<char>>) -> Self {
+    pub(super) fn new(mut ranges: Vec<RangeInclusive<char>>) -> Self {
         if ranges.is_empty() {
             return CharSet { ranges: Vec::new() };
         }
@@ -42,12 +40,12 @@ impl CharSet {
     }
 
     /// Returns the ranges covered by this character set.
-    pub fn ranges(&self) -> &[RangeInclusive<char>] {
+    pub(crate) fn ranges(&self) -> &[RangeInclusive<char>] {
         &self.ranges
     }
 
     /// Computes the complement of the character set, excluding newline and UTF-16 surrogates.
-    pub fn complement(&self) -> CharSet {
+    pub(crate) fn complement(&self) -> CharSet {
         let mut comp_ranges = Vec::new();
         let mut current_start = 0u32;
 
@@ -104,7 +102,7 @@ impl CharSet {
 
 #[derive(Debug, Clone, PartialEq)]
 /// The AST node kinds produced by the regex parser.
-pub enum RegexAstKind {
+pub(crate) enum RegexAstKind {
     /// A literal character.
     Literal(char),
     /// The wildcard dot operator.
@@ -127,14 +125,14 @@ pub enum RegexAstKind {
 
 #[derive(Debug, Clone, PartialEq)]
 /// A regex AST node with source span information.
-pub struct RegexAst {
+pub(crate) struct RegexAst {
     kind: RegexAstKind,
-    span: Span,
+    span: Range<usize>,
 }
 
 impl RegexAst {
     /// Creates a new AST node.
-    pub fn new(kind: RegexAstKind, span: Span) -> Self {
+    pub fn new(kind: RegexAstKind, span: Range<usize>) -> Self {
         Self { kind, span }
     }
 
@@ -145,16 +143,14 @@ impl RegexAst {
 
     #[allow(unused)]
     /// Returns the source span for this node.
-    pub fn span(&self) -> Span {
-        self.span
+    pub fn span(&self) -> &Range<usize> {
+        &self.span
     }
 }
 
 #[cfg(test)]
 mod tests {
     use std::ops::RangeInclusive;
-
-    use crate::span::{Location, Span};
 
     use super::{CharSet, RegexAst, RegexAstKind};
 
@@ -186,10 +182,10 @@ mod tests {
 
     #[test]
     fn regex_ast_accessors_return_original_values() {
-        let span = Span::new(Location::new(1, 2), Location::new(1, 3));
+        let span = 1..2;
         let ast = RegexAst::new(RegexAstKind::Literal('x'), span);
 
         assert!(matches!(ast.kind(), RegexAstKind::Literal('x')));
-        assert_eq!(ast.span(), span);
+        assert_eq!(ast.span(), &(1..2));
     }
 }

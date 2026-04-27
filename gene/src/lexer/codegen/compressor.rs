@@ -8,15 +8,15 @@ pub(super) struct EquivalenceClasses {
 
 impl EquivalenceClasses {
     pub(super) fn compute(dfa: &Dfa) -> Self {
-        let num_states = dfa.states().len();
+        let num_states = dfa.states.len();
         let mut class_map = [0u8; 256];
         let mut unique_columns = Vec::new();
 
         #[allow(clippy::needless_range_loop)]
         for byte in 0..=255 {
             let mut column = Vec::with_capacity(num_states);
-            for state in dfa.states() {
-                let target = match state.transitions()[byte] {
+            for state in &dfa.states {
+                let target = match state.transitions[byte] {
                     Some(idx) => (idx + 1) as u16,
                     None => 0,
                 };
@@ -65,8 +65,14 @@ mod tests {
             .expect("definition should parse");
 
         let mut nfa_builder = NfaBuilder::new();
-        for (id, rule) in definition.rules().iter().enumerate() {
-            nfa_builder.add_rule(rule.ast(), TokenMetadata::new(rule.priority(), id));
+        for (id, rule) in definition.rules.iter().enumerate() {
+            nfa_builder.add_rule(
+                &rule.ast,
+                TokenMetadata {
+                    priority: rule.priority,
+                    id,
+                },
+            );
         }
 
         let nfa = nfa_builder.build();

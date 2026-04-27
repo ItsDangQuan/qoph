@@ -38,13 +38,13 @@ impl RustEmitter {
         writeln!(out, "#[derive(Debug, Clone, PartialEq, Eq)]")?;
         writeln!(out, "pub enum Token<'a> {{")?;
 
-        for rule in self.definition.rules() {
-            match rule.payload() {
+        for rule in &self.definition.rules {
+            match rule.payload {
                 definition::PayloadType::None => {
-                    writeln!(out, "    {},", rule.variant_name())?;
+                    writeln!(out, "    {},", rule.variant_name)?;
                 }
                 definition::PayloadType::StringSlice => {
-                    writeln!(out, "    {}(&'a str),", rule.variant_name())?;
+                    writeln!(out, "    {}(&'a str),", rule.variant_name)?;
                 }
             }
         }
@@ -55,7 +55,7 @@ impl RustEmitter {
     }
 
     fn emit_tables(&self, out: &mut String) -> Result<(), fmt::Error> {
-        let num_states = self.dfa.states().len();
+        let num_states = self.dfa.states.len();
         let table_size = num_states + 1;
         let eq_classes = EquivalenceClasses::compute(&self.dfa);
 
@@ -92,9 +92,9 @@ impl RustEmitter {
 
         writeln!(out, "const ACCEPT: [Option<u16>; {}] = [", table_size)?;
         writeln!(out, "    None,")?;
-        for state in self.dfa.states() {
-            match state.accept() {
-                Some(metadata) => writeln!(out, "    Some({}),", metadata.id())?,
+        for state in &self.dfa.states {
+            match state.accept {
+                Some(metadata) => writeln!(out, "    Some({}),", metadata.id)?,
                 None => writeln!(out, "    None,")?,
             }
         }
@@ -150,7 +150,7 @@ impl RustEmitter {
         writeln!(
             out,
             "        let mut current_state: u16 = {};",
-            self.dfa.start() + 1
+            self.dfa.start + 1
         )?;
         writeln!(out, "        let mut last_accept_state = None;")?;
         writeln!(out, "        let mut last_accept_cursor = self.cursor;")?;
@@ -186,19 +186,17 @@ impl RustEmitter {
         writeln!(out)?;
         writeln!(out, "            let token = match rule_id {{")?;
 
-        for (id, rule) in self.definition.rules().iter().enumerate() {
-            match rule.payload() {
+        for (id, rule) in self.definition.rules.iter().enumerate() {
+            match rule.payload {
                 PayloadType::None => writeln!(
                     out,
                     "                {} => Token::{},",
-                    id,
-                    rule.variant_name()
+                    id, rule.variant_name
                 )?,
                 PayloadType::StringSlice => writeln!(
                     out,
                     "                {} => Token::{}(slice),",
-                    id,
-                    rule.variant_name()
+                    id, rule.variant_name
                 )?,
             }
         }
@@ -247,8 +245,14 @@ mod tests {
             .expect("definition should parse");
 
         let mut nfa_builder = NfaBuilder::new();
-        for (id, rule) in definition.rules().iter().enumerate() {
-            nfa_builder.add_rule(rule.ast(), TokenMetadata::new(rule.priority(), id));
+        for (id, rule) in definition.rules.iter().enumerate() {
+            nfa_builder.add_rule(
+                &rule.ast,
+                TokenMetadata {
+                    priority: rule.priority,
+                    id,
+                },
+            );
         }
 
         let nfa = nfa_builder.build();

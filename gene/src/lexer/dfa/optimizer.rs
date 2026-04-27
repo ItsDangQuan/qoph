@@ -46,7 +46,7 @@ impl DfaOptimizer {
 
         for (i, state) in self.dfa.states.iter().enumerate() {
             if let Some(metadata) = &state.accept {
-                accepting_groups.entry(metadata.id()).or_default().insert(i);
+                accepting_groups.entry(metadata.id).or_default().insert(i);
             } else {
                 non_accepting.insert(i);
             }
@@ -188,10 +188,16 @@ mod tests {
         s0.transitions[b'b' as usize] = Some(2);
 
         let mut s1 = DfaState::new();
-        s1.accept = Some(TokenMetadata::new(0, 11));
+        s1.accept = Some(TokenMetadata {
+            priority: 0,
+            id: 11,
+        });
 
         let mut s2 = DfaState::new();
-        s2.accept = Some(TokenMetadata::new(0, 12));
+        s2.accept = Some(TokenMetadata {
+            priority: 0,
+            id: 12,
+        });
 
         let dfa = Dfa {
             states: vec![s0, s1, s2],

@@ -1,4 +1,4 @@
-use crate::{lexer::regex::RegexParser, span::Location};
+use crate::lexer::regex::RegexParser;
 
 use super::ast::{LexerDefinition, LexerRule, PayloadType};
 use super::error::{DefinitionParserError, DefinitionParserErrorKind, DefinitionParserResult};
@@ -15,21 +15,25 @@ impl<'a> DefinitionParser<'a> {
     pub(crate) fn parse(&self) -> DefinitionParserResult<LexerDefinition> {
         let mut rules = Vec::new();
         let mut priority = 0;
+        let mut line_start = 0;
 
-        for (line_index, line) in self.input.lines().enumerate() {
-            let line_number = line_index + 1;
+        for line_with_newline in self.input.split_inclusive('\n') {
+            let line = line_with_newline
+                .strip_suffix('\n')
+                .unwrap_or(line_with_newline);
 
             if line.trim().is_empty() || line.trim_start().starts_with("//") {
+                line_start += line_with_newline.len();
                 continue;
             }
 
             let split_byte_idx = match line.find("::=") {
                 Some(idx) => idx,
                 None => {
-                    let col = line.chars().take_while(|c| c.is_whitespace()).count() + 1;
+                    let leading_whitespace = line.len() - line.trim_start().len();
                     return Err(DefinitionParserError::new(
                         DefinitionParserErrorKind::MissingDelimiter,
-                        Location::new(line_number, col),
+                        line_start + leading_whitespace,
                     ));
                 }
             };
@@ -41,8 +45,7 @@ impl<'a> DefinitionParser<'a> {
             let whitespace_offset = after_delimiter.len() - regex_str.len();
             let regex_byte_start = split_byte_idx + 3 + whitespace_offset;
 
-            let regex_column = 1 + line[..regex_byte_start].chars().count();
-            let regex_loc = Location::new(line_number, regex_column);
+            let regex_loc = line_start + regex_byte_start;
 
             if regex_str.is_empty() {
                 return Err(DefinitionParserError::new(
@@ -51,8 +54,7 @@ impl<'a> DefinitionParser<'a> {
                 ));
             }
 
-            let category_col = 1 + line.chars().take_while(|c| c.is_whitespace()).count();
-            let category_loc = Location::new(line_number, category_col);
+            let category_loc = line_start + (line.len() - line.trim_start().len());
 
             let (variant_name, payload) = Self::parse_category(left_side, category_loc)?;
 
@@ -67,24 +69,30 @@ impl<'a> DefinitionParser<'a> {
                 }
             };
 
-            rules.push(LexerRule::new(ast, variant_name, payload, priority));
+            rules.push(LexerRule {
+                ast,
+                variant_name,
+                payload,
+                priority,
+            });
 
             priority += 1;
+            line_start += line_with_newline.len();
         }
 
         if rules.is_empty() {
             return Err(DefinitionParserError::new(
                 DefinitionParserErrorKind::NoRules,
-                Location::new(0, 0),
+                0,
             ));
         }
 
-        Ok(LexerDefinition::new(rules))
+        Ok(LexerDefinition { rules })
     }
 
     fn parse_category(
         input: &str,
-        location: Location,
+        location: usize,
     ) -> DefinitionParserResult<(String, PayloadType)> {
         if input.is_empty() {
             return Err(DefinitionParserError::new(
@@ -167,7 +175,6 @@ mod tests {
         DefinitionParser, DefinitionParserError, DefinitionParserErrorKind, LexerDefinition,
         PayloadType,
     };
-    use crate::span::Location;
 
     fn parse_ok(input: &str) -> LexerDefinition {
         DefinitionParser::new(input)
@@ -184,22 +191,22 @@ mod tests {
     #[test]
     fn parses_single_rule_without_payload() {
         let def = parse_ok("Ident ::= a");
-        assert_eq!(def.rules().len(), 1);
+        assert_eq!(def.rules.len(), 1);
 
-        let rule = &def.rules()[0];
-        assert_eq!(rule.variant_name(), "Ident");
-        assert_eq!(rule.payload(), &PayloadType::None);
-        assert_eq!(rule.priority(), 0);
-        assert!(matches!(rule.ast().kind(), RegexAstKind::Literal('a')));
+        let rule = &def.rules[0];
+        assert_eq!(rule.variant_name, "Ident");
+        assert_eq!(rule.payload, PayloadType::None);
+        assert_eq!(rule.priority, 0);
+        assert!(matches!(rule.ast.kind(), RegexAstKind::Literal('a')));
     }
 
     #[test]
     fn parses_string_payload_rule() {
         let def = parse_ok("Ident(str) ::= [a-z]+");
-        assert_eq!(def.rules().len(), 1);
-        assert_eq!(def.rules()[0].variant_name(), "Ident");
-        assert_eq!(def.rules()[0].payload(), &PayloadType::StringSlice);
-        assert_eq!(def.rules()[0].priority(), 0);
+        assert_eq!(def.rules.len(), 1);
+        assert_eq!(def.rules[0].variant_name, "Ident");
+        assert_eq!(def.rules[0].payload, PayloadType::StringSlice);
+        assert_eq!(def.rules[0].priority, 0);
     }
 
     #[test]
@@ -207,21 +214,21 @@ mod tests {
         let input = "\n// comment\n\nA ::= a\n  // ignored\nB(str) ::= b+\nC ::= c\n";
         let def = parse_ok(input);
 
-        assert_eq!(def.rules().len(), 3);
-        assert_eq!(def.rules()[0].variant_name(), "A");
-        assert_eq!(def.rules()[0].priority(), 0);
-        assert_eq!(def.rules()[1].variant_name(), "B");
-        assert_eq!(def.rules()[1].payload(), &PayloadType::StringSlice);
-        assert_eq!(def.rules()[1].priority(), 1);
-        assert_eq!(def.rules()[2].variant_name(), "C");
-        assert_eq!(def.rules()[2].priority(), 2);
+        assert_eq!(def.rules.len(), 3);
+        assert_eq!(def.rules[0].variant_name, "A");
+        assert_eq!(def.rules[0].priority, 0);
+        assert_eq!(def.rules[1].variant_name, "B");
+        assert_eq!(def.rules[1].payload, PayloadType::StringSlice);
+        assert_eq!(def.rules[1].priority, 1);
+        assert_eq!(def.rules[2].variant_name, "C");
+        assert_eq!(def.rules[2].priority, 2);
     }
 
     #[test]
     fn reports_no_rules_for_empty_or_comment_only_input() {
         let error = parse_err("\n// only comments\n  // and spaces\n");
         assert!(matches!(error.kind(), DefinitionParserErrorKind::NoRules));
-        assert_eq!(error.location(), Location::new(0, 0));
+        assert_eq!(error.location(), 0);
     }
 
     #[test]
@@ -231,7 +238,7 @@ mod tests {
             error.kind(),
             DefinitionParserErrorKind::MissingDelimiter
         ));
-        assert_eq!(error.location(), Location::new(1, 4));
+        assert_eq!(error.location(), 3);
     }
 
     #[test]
@@ -241,7 +248,7 @@ mod tests {
             error.kind(),
             DefinitionParserErrorKind::EmptyRegex
         ));
-        assert_eq!(error.location(), Location::new(1, 14));
+        assert_eq!(error.location(), 13);
     }
 
     #[test]
@@ -251,7 +258,7 @@ mod tests {
             error.kind(),
             DefinitionParserErrorKind::EmptyCategory
         ));
-        assert_eq!(error.location(), Location::new(1, 4));
+        assert_eq!(error.location(), 3);
     }
 
     #[test]
@@ -321,7 +328,7 @@ mod tests {
     fn display_includes_line_and_column_for_local_errors() {
         let error = parse_err("Ident(str)extra ::= a");
         let message = error.to_string();
-        assert!(message.contains("Error at line 1, column 1:"));
+        assert!(message.contains("Error at byte 0:"));
         assert!(message.contains("Mismatched payload parentheses."));
     }
 }

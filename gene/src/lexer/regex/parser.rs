@@ -1,65 +1,73 @@
-use std::{iter::Peekable, str::Chars};
-
-use crate::span::{Location, Span};
+use crate::lexer::regex::{RegexAst, RegexAstKind, RegexParserError};
 
 use super::{
-    CharSet, RegexAst, RegexAstKind, RegexParserError, RegexParserErrorKind, RegexParserResult,
+    ast::CharSet,
+    error::{RegexParserErrorKind, RegexParserResult},
 };
 
 /// Recursive-descent parser for the regex grammar used in lexer definitions.
-pub struct RegexParser<'a> {
-    chars: Peekable<Chars<'a>>,
-    current_line: usize,
-    current_column: usize,
+pub(crate) struct RegexParser<'a> {
+    input: &'a str,
+    cursor: usize,
+    start_offset: usize,
 }
 
 impl<'a> RegexParser<'a> {
     #[allow(unused)]
     /// Creates a parser over the supplied input.
-    pub fn new(input: &'a str) -> Self {
+    pub(crate) fn new(input: &'a str) -> Self {
         Self {
-            chars: input.chars().peekable(),
-            current_line: 1,
-            current_column: 1,
+            input,
+            cursor: 0,
+            start_offset: 0,
         }
     }
 
-    /// Creates a parser over the supplied input, starting at a specific absolute location.
-    pub fn with_location(input: &'a str, start_location: Location) -> Self {
+    /// Creates a parser over the supplied input, starting at a specific absolute byte offset.
+    pub(crate) fn with_location(input: &'a str, start_offset: usize) -> Self {
         Self {
-            chars: input.chars().peekable(),
-            current_line: start_location.line(),
-            current_column: start_location.column(),
+            input,
+            cursor: 0,
+            start_offset,
         }
     }
 
-    /// Returns the parser's current 1-based source location.
-    fn current_location(&self) -> Location {
-        Location::new(self.current_line, self.current_column)
+    /// Returns the parser's current absolute byte offset.
+    fn current_location(&self) -> usize {
+        self.start_offset + self.cursor
     }
 
-    /// Consumes one character and advances the tracked location.
+    fn peek_char(&self) -> Option<char> {
+        self.input[self.cursor..].chars().next()
+    }
+
+    /// Consumes one character and advances the tracked byte offset.
     fn consume(&mut self) -> Option<char> {
-        match self.chars.next() {
-            Some('\n') => {
-                self.current_line += 1;
-                self.current_column = 1;
-                Some('\n')
+        let c = self.peek_char()?;
+        self.cursor += c.len_utf8();
+        Some(c)
+    }
+
+    fn at_end(&self) -> bool {
+        self.cursor >= self.input.len()
+    }
+
+    fn expect_char(&mut self, expected: char) -> bool {
+        match self.peek_char() {
+            Some(c) if c == expected => {
+                self.consume();
+                true
             }
-            Some(c) => {
-                self.current_column += 1;
-                Some(c)
-            }
-            None => None,
+            _ => false,
         }
     }
 
     /// Parses a full regular-expression expression.
     ///
     /// The parser accepts the complete grammar and rejects trailing input.
-    pub fn parse(&mut self) -> RegexParserResult<RegexAst> {
+    pub(crate) fn parse(&mut self) -> RegexParserResult<RegexAst> {
         let ast = self.parse_alternation()?;
-        if let Some(c) = self.chars.peek().copied() {
+        if let Some(c) = self.peek_char() {
             let location = self.current_location();
             self.consume();
             return Err(RegexParserError::new(
@@ -76,13 +84,12 @@ impl<'a> RegexParser<'a> {
 
         let mut left = self.parse_concatenation()?;
 
-        while let Some(&'|') = self.chars.peek() {
-            self.consume();
+        while self.expect_char('|') {
             let right = self.parse_concatenation()?;
             let end_loc = self.current_location();
             left = RegexAst::new(
                 RegexAstKind::Alternation(Box::new(left), Box::new(right)),
-                Span::new(start_loc, end_loc),
+                start_loc..end_loc,
             )
         }
 
@@ -95,7 +102,7 @@ impl<'a> RegexParser<'a> {
 
         let mut left = self.parse_closure()?;
 
-        while let Some(&c) = self.chars.peek() {
+        while let Some(c) = self.peek_char() {
             if matches!(c, '|' | ')' | '*' | '+' | '?') {
                 break;
             }
@@ -103,7 +110,7 @@ impl<'a> RegexParser<'a> {
             let end_loc = self.current_location();
             left = RegexAst::new(
                 RegexAstKind::Concatenation(Box::new(left), Box::new(right)),
-                Span::new(start_loc, end_loc),
+                start_loc..end_loc,
             )
         }
 
@@ -116,14 +123,14 @@ impl<'a> RegexParser<'a> {
 
         let base = self.parse_base()?;
 
-        if let Some(&c) = self.chars.peek() {
+        if let Some(c) = self.peek_char() {
             match c {
                 '*' => {
                     self.consume();
                     let end_loc = self.current_location();
                     return Ok(RegexAst::new(
                         RegexAstKind::KleeneClosure(Box::new(base)),
-                        Span::new(start_loc, end_loc),
+                        start_loc..end_loc,
                     ));
                 }
                 '+' => {
@@ -131,7 +138,7 @@ impl<'a> RegexParser<'a> {
                     let end_loc = self.current_location();
                     return Ok(RegexAst::new(
                         RegexAstKind::PositiveClosure(Box::new(base)),
-                        Span::new(start_loc, end_loc),
+                        start_loc..end_loc,
                     ));
                 }
                 '?' => {
@@ -139,7 +146,7 @@ impl<'a> RegexParser<'a> {
                     let end_loc = self.current_location();
                     return Ok(RegexAst::new(
                         RegexAstKind::OptionalClosure(Box::new(base)),
-                        Span::new(start_loc, end_loc),
+                        start_loc..end_loc,
                     ));
                 }
                 _ => {}
@@ -168,24 +175,15 @@ impl<'a> RegexParser<'a> {
             Some('\\') => {
                 let c = self.parse_escape_sequence()?;
                 let end_loc = self.current_location();
-                Ok(RegexAst::new(
-                    RegexAstKind::Literal(c),
-                    Span::new(start_loc, end_loc),
-                ))
+                Ok(RegexAst::new(RegexAstKind::Literal(c), start_loc..end_loc))
             }
             Some('.') => {
                 let end_loc = self.current_location();
-                Ok(RegexAst::new(
-                    RegexAstKind::Wildcard,
-                    Span::new(start_loc, end_loc),
-                ))
+                Ok(RegexAst::new(RegexAstKind::Wildcard, start_loc..end_loc))
             }
             Some(c) => {
                 let end_loc = self.current_location();
-                Ok(RegexAst::new(
-                    RegexAstKind::Literal(c),
-                    Span::new(start_loc, end_loc),
-                ))
+                Ok(RegexAst::new(RegexAstKind::Literal(c), start_loc..end_loc))
             }
             None => Err(RegexParserError::new(
                 RegexParserErrorKind::UnexpectedEof,
@@ -199,14 +197,13 @@ impl<'a> RegexParser<'a> {
 
         let mut negated = false;
 
-        if let Some(&'^') = self.chars.peek() {
+        if self.expect_char('^') {
             negated = true;
-            self.consume();
         }
 
         let mut ranges = Vec::new();
 
-        while let Some(&c) = self.chars.peek() {
+        while let Some(c) = self.peek_char() {
             if c == ']' {
                 self.consume();
                 let end_loc = self.current_location();
@@ -215,22 +212,20 @@ impl<'a> RegexParser<'a> {
                 return if negated {
                     Ok(RegexAst::new(
                         RegexAstKind::ComplementClass(charset),
-                        Span::new(start_loc, end_loc),
+                        start_loc..end_loc,
                     ))
                 } else {
                     Ok(RegexAst::new(
                         RegexAstKind::CharacterClass(charset),
-                        Span::new(start_loc, end_loc),
+                        start_loc..end_loc,
                     ))
                 };
             }
 
             let start_char = self.parse_class_item()?;
 
-            if let Some(&'-') = self.chars.peek() {
-                self.consume();
-
-                if let Some(&']') = self.chars.peek() {
+            if self.expect_char('-') {
+                if matches!(self.peek_char(), Some(']')) {
                     ranges.push(start_char..=start_char);
                     ranges.push('-'..='-');
                     continue;
@@ -273,23 +268,25 @@ impl<'a> RegexParser<'a> {
 
     /// Parses an escape sequence and maps the supported escapes to characters.
     fn parse_escape_sequence(&mut self) -> RegexParserResult<char> {
+        if self.at_end() {
+            return Err(RegexParserError::new(
+                RegexParserErrorKind::TrailingBackslash,
+                self.current_location(),
+            ));
+        }
+
         match self.consume() {
             Some('n') => Ok('\n'),
             Some('t') => Ok('\t'),
             Some('r') => Ok('\r'),
             Some(c) => Ok(c),
-            None => Err(RegexParserError::new(
-                RegexParserErrorKind::TrailingBackslash,
-                self.current_location(),
-            )),
+            None => unreachable!("at_end check above guarantees one character"),
         }
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use crate::span::Location;
-
     use super::*;
 
     fn parse_ok(input: &str) -> RegexAst {
@@ -313,16 +310,14 @@ mod tests {
     fn parses_single_literal() {
         let ast = parse_ok("a");
         assert_eq!(literal(&ast), 'a');
-        assert_eq!(ast.span().start(), Location::new(1, 1));
-        assert_eq!(ast.span().end(), Location::new(1, 2));
+        assert_eq!(ast.span(), &(0..1));
     }
 
     #[test]
     fn parses_unicode_literal_as_single_char() {
         let ast = parse_ok("é");
         assert_eq!(literal(&ast), 'é');
-        assert_eq!(ast.span().start(), Location::new(1, 1));
-        assert_eq!(ast.span().end(), Location::new(1, 2));
+        assert_eq!(ast.span(), &(0..2));
     }
 
     #[test]
@@ -389,8 +384,7 @@ mod tests {
             other => panic!("expected concatenation, got {other:?}"),
         }
 
-        assert_eq!(ast.span().start(), Location::new(1, 1));
-        assert_eq!(ast.span().end(), Location::new(1, 5));
+        assert_eq!(ast.span(), &(0..4));
     }
 
     #[test]
@@ -476,7 +470,7 @@ mod tests {
     fn reports_unclosed_character_class() {
         let error = parse_err("[ab");
         assert_eq!(error.kind(), &RegexParserErrorKind::UnclosedCharClass);
-        assert_eq!(error.location(), Location::new(1, 4));
+        assert_eq!(error.location(), 3);
     }
 
     #[test]
@@ -495,27 +489,27 @@ mod tests {
     fn reports_trailing_backslash() {
         let error = parse_err("\\");
         assert_eq!(error.kind(), &RegexParserErrorKind::TrailingBackslash);
-        assert_eq!(error.location(), Location::new(1, 2));
+        assert_eq!(error.location(), 1);
     }
 
     #[test]
     fn reports_unclosed_grouping() {
         let error = parse_err("(a");
         assert_eq!(error.kind(), &RegexParserErrorKind::UnclosedGrouping);
-        assert_eq!(error.location(), Location::new(1, 3));
+        assert_eq!(error.location(), 2);
     }
 
     #[test]
     fn reports_unclosed_grouping_with_newline_location() {
         let error = parse_err("(\n");
         assert_eq!(error.kind(), &RegexParserErrorKind::UnclosedGrouping);
-        assert_eq!(error.location(), Location::new(2, 1));
+        assert_eq!(error.location(), 2);
     }
 
     #[test]
     fn reports_unexpected_trailing_char() {
         let error = parse_err("a)");
         assert_eq!(error.kind(), &RegexParserErrorKind::UnexpectedChar(')'));
-        assert_eq!(error.location(), Location::new(1, 2));
+        assert_eq!(error.location(), 1);
     }
 }

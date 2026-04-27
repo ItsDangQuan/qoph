@@ -1,6 +1,6 @@
 use std::{error::Error, fmt};
 
-use crate::{lexer::regex::RegexParserError, span::Location};
+use crate::lexer::regex::RegexParserError;
 
 #[derive(Debug)]
 pub(super) enum DefinitionParserErrorKind {
@@ -17,11 +17,11 @@ pub(super) enum DefinitionParserErrorKind {
 #[derive(Debug)]
 pub(crate) struct DefinitionParserError {
     kind: DefinitionParserErrorKind,
-    location: Location,
+    location: usize,
 }
 
 impl DefinitionParserError {
-    pub(super) fn new(kind: DefinitionParserErrorKind, location: Location) -> Self {
+    pub(super) fn new(kind: DefinitionParserErrorKind, location: usize) -> Self {
         Self { kind, location }
     }
 
@@ -31,14 +31,14 @@ impl DefinitionParserError {
     }
 
     #[allow(unused)]
-    pub(super) fn location(&self) -> Location {
+    pub(super) fn location(&self) -> usize {
         self.location
     }
 }
 
 impl fmt::Display for DefinitionParserError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        if self.location.line() == 0 {
+        if matches!(&self.kind, DefinitionParserErrorKind::NoRules) {
             return match &self.kind {
                 DefinitionParserErrorKind::NoRules => {
                     write!(f, "Lexer definition contains no valid rules.")
@@ -47,12 +47,7 @@ impl fmt::Display for DefinitionParserError {
             };
         }
 
-        write!(
-            f,
-            "Error at line {}, column {}: ",
-            self.location.line(),
-            self.location.column()
-        )?;
+        write!(f, "Error at byte {}: ", self.location)?;
 
         match &self.kind {
             DefinitionParserErrorKind::MissingDelimiter => {
@@ -88,19 +83,15 @@ pub(super) type DefinitionParserResult<T> = Result<T, DefinitionParserError>;
 #[cfg(test)]
 mod tests {
     use super::{DefinitionParserError, DefinitionParserErrorKind};
-    use crate::span::Location;
 
     #[test]
     fn accessors_return_constructor_data() {
-        let err = DefinitionParserError::new(
-            DefinitionParserErrorKind::MissingDelimiter,
-            Location::new(3, 8),
-        );
+        let err = DefinitionParserError::new(DefinitionParserErrorKind::MissingDelimiter, 8);
 
         assert!(matches!(
             err.kind(),
             DefinitionParserErrorKind::MissingDelimiter
         ));
-        assert_eq!(err.location(), Location::new(3, 8));
+        assert_eq!(err.location(), 8);
     }
 }

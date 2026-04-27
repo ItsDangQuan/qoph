@@ -218,18 +218,21 @@ mod tests {
     #[test]
     fn literal_rule_emits_match_then_accept_with_metadata() {
         let ast = parse_regex("a");
-        let metadata = TokenMetadata::new(0, 42);
+        let metadata = TokenMetadata {
+            priority: 0,
+            id: 42,
+        };
 
         let mut builder = NfaBuilder::new();
         builder.add_rule(&ast, metadata);
         let nfa = builder.build();
 
-        let start = nfa.start();
-        match nfa.states()[start].transition() {
+        let start = nfa.start;
+        match nfa.states[start].transition {
             Transition::MatchRange(s, e, next) => {
-                assert_eq!((*s, *e), (b'a', b'a'));
-                match nfa.states()[*next].transition() {
-                    Transition::Accept(m) => assert_eq!(*m, metadata),
+                assert_eq!((s, e), (b'a', b'a'));
+                match nfa.states[next].transition {
+                    Transition::Accept(m) => assert_eq!(m, metadata),
                     _ => panic!("expected accept state"),
                 }
             }
@@ -242,11 +245,11 @@ mod tests {
         let ast = parse_regex("[]");
 
         let mut builder = NfaBuilder::new();
-        builder.add_rule(&ast, TokenMetadata::new(0, 0));
+        builder.add_rule(&ast, TokenMetadata { priority: 0, id: 0 });
         let nfa = builder.build();
 
         assert!(matches!(
-            nfa.states()[nfa.start()].transition(),
+            nfa.states[nfa.start].transition,
             Transition::DeadEnd
         ));
     }
@@ -257,12 +260,12 @@ mod tests {
         let b = parse_regex("b");
 
         let mut builder = NfaBuilder::new();
-        builder.add_rule(&a, TokenMetadata::new(0, 0));
-        builder.add_rule(&b, TokenMetadata::new(1, 1));
+        builder.add_rule(&a, TokenMetadata { priority: 0, id: 0 });
+        builder.add_rule(&b, TokenMetadata { priority: 0, id: 1 });
 
         let nfa = builder.build();
         assert!(matches!(
-            nfa.states()[nfa.start()].transition(),
+            nfa.states[nfa.start].transition,
             Transition::Epsilon(_, Some(_))
         ));
     }
