@@ -1,10 +1,9 @@
 use std::fmt::{self, Write};
 
-use crate::lexer::{
-    codegen::compressor::EquivalenceClasses,
-    definition::{self, LexerDefinition, PayloadType},
-    dfa::Dfa,
-};
+use crate::lexer::definition::{LexerDefinition, PayloadType};
+use crate::lexer::dfa::Dfa;
+
+use super::compressor::EquivalenceClasses;
 
 pub(crate) struct RustEmitter {
     definition: LexerDefinition,
@@ -40,10 +39,10 @@ impl RustEmitter {
 
         for rule in &self.definition.rules {
             match rule.payload {
-                definition::PayloadType::None => {
+                PayloadType::None => {
                     writeln!(out, "    {},", rule.variant_name)?;
                 }
-                definition::PayloadType::StringSlice => {
+                PayloadType::StringSlice => {
                     writeln!(out, "    {}(&'a str),", rule.variant_name)?;
                 }
             }

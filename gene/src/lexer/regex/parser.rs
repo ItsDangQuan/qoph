@@ -1,9 +1,5 @@
-use crate::lexer::regex::{RegexAst, RegexAstKind, RegexParserError};
-
-use super::{
-    ast::CharSet,
-    error::{RegexParserErrorKind, RegexParserResult},
-};
+use super::ast::{CharSet, RegexAst, RegexAstKind};
+use super::error::{RegexParserError, RegexParserErrorKind, RegexParserResult};
 
 /// Recursive-descent parser for the regex grammar used in lexer definitions.
 pub(crate) struct RegexParser<'a> {

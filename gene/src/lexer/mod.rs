@@ -9,13 +9,11 @@
 
 use std::error::Error;
 
-use crate::lexer::{
-    codegen::RustEmitter,
-    definition::DefinitionParser,
-    dfa::{DfaBuilder, DfaOptimizer},
-    metadata::TokenMetadata,
-    nfa::NfaBuilder,
-};
+use codegen::RustEmitter;
+use definition::DefinitionParser;
+use dfa::{DfaBuilder, DfaOptimizer};
+use metadata::TokenMetadata;
+use nfa::NfaBuilder;
 
 mod codegen;
 mod definition;
