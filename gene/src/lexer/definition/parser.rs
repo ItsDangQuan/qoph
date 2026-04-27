@@ -58,7 +58,7 @@ impl<'a> DefinitionParser<'a> {
 
             let (variant_name, payload) = Self::parse_category(left_side, category_loc)?;
 
-            let mut regex_parser = RegexParser::with_location(regex_str, regex_loc);
+            let mut regex_parser = RegexParser::new(regex_str, regex_loc);
             let ast = match regex_parser.parse() {
                 Ok(ast) => ast,
                 Err(e) => {
@@ -169,7 +169,7 @@ impl<'a> DefinitionParser<'a> {
 
 #[cfg(test)]
 mod tests {
-    use crate::lexer::regex::RegexAstKind;
+    use crate::lexer::regex::RegexAst;
 
     use super::{
         DefinitionParser, DefinitionParserError, DefinitionParserErrorKind, LexerDefinition,
@@ -197,7 +197,7 @@ mod tests {
         assert_eq!(rule.variant_name, "Ident");
         assert_eq!(rule.payload, PayloadType::None);
         assert_eq!(rule.priority, 0);
-        assert!(matches!(rule.ast.kind, RegexAstKind::Literal('a')));
+        assert!(matches!(rule.ast, RegexAst::Literal('a')));
     }
 
     #[test]

@@ -2,24 +2,28 @@
 //!
 //! Grammar overview:
 //!
-//! ```text
-//! Expression      ::= Alternation
-//! Alternation     ::= Concatenation ( '|' Concatenation )*
-//! Concatenation   ::= Closure ( Closure )*
-//! Closure         ::= Base ( '*' | '+' | '?' )?
-//! Base            ::= Literal | '.' | EscapeSequence | CharacterClass | '(' Expression ')'
-//! CharacterClass  ::= '[' '^'? ClassItem+ ']'
-//! ClassItem       ::= ClassChar '-' ClassChar | ClassChar | EscapeSequence
-//! ClassChar       ::= any character except ']' and '\'
-//! EscapeSequence   ::= '\' ( 'n' | 't' | 'r' | any other character )
-//! Literal         ::= any character except control characters '|', '*', '+', '?', '(', ')', '[', '\', '.'
+//! ```peg
+//! Expression     <- Alternation !.
+//! Alternation    <- Concatenation ( '|' Concatenation )*
+//! Concatenation  <- Closure ( !( '|' / ')' ) Closure )*
+//! Closure        <- Base ( '*' / '+' / '?' )?
+//! Base           <- '(' Alternation ')'
+//!                 / '[' CharacterClass ']'
+//!                 / '\\' EscapeCode
+//!                 / '.'
+//!                 / !( '|' / '*' / '+' / '?' / '(' / ')' / '[' / ']' ) .
+//! CharacterClass <- '^'? ( !']' ClassItem )*
+//! ClassItem      <- ClassBound ( '-' ClassBound )?
+//! ClassBound     <- '\\' EscapeCode
+//!                 / !( ']' / '-' ) .
+//! EscapeCode     <- 'n' / 't' / 'r' / .
 //! ```
 
-mod charset;
+mod char_set;
 mod core;
 mod error;
 mod parser;
 
-pub(crate) use core::{RegexAst, RegexAstKind};
+pub(crate) use core::RegexAst;
 pub(crate) use error::RegexParserError;
 pub(crate) use parser::RegexParser;

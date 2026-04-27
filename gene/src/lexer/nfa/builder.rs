@@ -1,5 +1,5 @@
 use crate::lexer::metadata::TokenMetadata;
-use crate::lexer::regex::{RegexAst, RegexAstKind};
+use crate::lexer::regex::RegexAst;
 
 use super::byte::{utf8_expand, wildcard_sequences};
 use super::core::{Nfa, NfaState, Transition};
@@ -24,7 +24,7 @@ impl NfaBuilder {
     }
 
     pub(crate) fn add_rule(&mut self, ast: &RegexAst, metadata: TokenMetadata) {
-        let (start, _) = self.build_recursive(&ast.kind, metadata);
+        let (start, _) = self.build_recursive(&ast, metadata);
         self.rule_entry_points.push(start);
     }
 
@@ -41,9 +41,9 @@ impl NfaBuilder {
         }
     }
 
-    fn build_recursive(&mut self, kind: &RegexAstKind, metadata: TokenMetadata) -> (usize, usize) {
+    fn build_recursive(&mut self, kind: &RegexAst, metadata: TokenMetadata) -> (usize, usize) {
         match kind {
-            RegexAstKind::Literal(c) => {
+            RegexAst::Literal(c) => {
                 let mut buf = [0; 4];
                 let bytes = c.encode_utf8(&mut buf).as_bytes();
 
@@ -59,7 +59,7 @@ impl NfaBuilder {
 
                 (start_state, accept)
             }
-            RegexAstKind::Wildcard => {
+            RegexAst::Wildcard => {
                 let accept = self.add_state(Transition::Accept(metadata));
                 let mut branch_starts = Vec::with_capacity(wildcard_sequences().len());
 
@@ -82,7 +82,7 @@ impl NfaBuilder {
                 let final_start = self.build_epsilon_tree(branch_starts);
                 (final_start, accept)
             }
-            RegexAstKind::CharacterClass(char_set) => {
+            RegexAst::CharacterClass(char_set) => {
                 let accept = self.add_state(Transition::Accept(metadata));
                 let mut branch_starts = Vec::new();
 
@@ -109,23 +109,23 @@ impl NfaBuilder {
                 let final_start = self.build_epsilon_tree(branch_starts);
                 (final_start, accept)
             }
-            RegexAstKind::ComplementClass(char_set) => {
+            RegexAst::ComplementClass(char_set) => {
                 let inverted_set = char_set.complement();
-                let positive_ast_kind = RegexAstKind::CharacterClass(inverted_set);
+                let positive_ast_kind = RegexAst::CharacterClass(inverted_set);
 
                 self.build_recursive(&positive_ast_kind, metadata)
             }
-            RegexAstKind::Concatenation(left, right) => {
-                let (left_start, left_accept) = self.build_recursive(&left.kind, metadata);
-                let (right_start, right_accept) = self.build_recursive(&right.kind, metadata);
+            RegexAst::Concatenation(left, right) => {
+                let (left_start, left_accept) = self.build_recursive(&left, metadata);
+                let (right_start, right_accept) = self.build_recursive(&right, metadata);
 
                 self.states[left_accept].transition = Transition::Epsilon(right_start, None);
 
                 (left_start, right_accept)
             }
-            RegexAstKind::Alternation(left, right) => {
-                let (left_start, left_accept) = self.build_recursive(&left.kind, metadata);
-                let (right_start, right_accept) = self.build_recursive(&right.kind, metadata);
+            RegexAst::Alternation(left, right) => {
+                let (left_start, left_accept) = self.build_recursive(&left, metadata);
+                let (right_start, right_accept) = self.build_recursive(&right, metadata);
 
                 let new_accept = self.add_state(Transition::Accept(metadata));
                 let new_start = self.add_state(Transition::Epsilon(left_start, Some(right_start)));
@@ -135,8 +135,8 @@ impl NfaBuilder {
 
                 (new_start, new_accept)
             }
-            RegexAstKind::KleeneClosure(base) => {
-                let (base_start, base_accept) = self.build_recursive(&base.kind, metadata);
+            RegexAst::KleeneClosure(base) => {
+                let (base_start, base_accept) = self.build_recursive(&base, metadata);
 
                 let new_accept = self.add_state(Transition::Accept(metadata));
                 let new_start = self.add_state(Transition::Epsilon(base_start, Some(new_accept)));
@@ -146,8 +146,8 @@ impl NfaBuilder {
 
                 (new_start, new_accept)
             }
-            RegexAstKind::PositiveClosure(base) => {
-                let (base_start, base_accept) = self.build_recursive(&base.kind, metadata);
+            RegexAst::PositiveClosure(base) => {
+                let (base_start, base_accept) = self.build_recursive(&base, metadata);
 
                 let new_accept = self.add_state(Transition::Accept(metadata));
 
@@ -156,8 +156,8 @@ impl NfaBuilder {
 
                 (base_start, new_accept)
             }
-            RegexAstKind::OptionalClosure(base) => {
-                let (base_start, base_accept) = self.build_recursive(&base.kind, metadata);
+            RegexAst::OptionalClosure(base) => {
+                let (base_start, base_accept) = self.build_recursive(&base, metadata);
 
                 let new_accept = self.add_state(Transition::Accept(metadata));
                 let new_start = self.add_state(Transition::Epsilon(base_start, Some(new_accept)));
@@ -205,7 +205,7 @@ mod tests {
     use super::{NfaBuilder, Transition};
 
     fn parse_regex(input: &str) -> crate::lexer::regex::RegexAst {
-        let mut parser = RegexParser::new(input);
+        let mut parser = RegexParser::new(input, 0);
         parser.parse().expect("regex should parse")
     }
 
