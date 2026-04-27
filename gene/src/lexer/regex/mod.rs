@@ -15,10 +15,11 @@
 //! Literal         ::= any character except control characters '|', '*', '+', '?', '(', ')', '[', '\', '.'
 //! ```
 
-mod ast;
+mod charset;
+mod core;
 mod error;
 mod parser;
 
-pub(crate) use ast::{RegexAst, RegexAstKind};
+pub(crate) use core::{RegexAst, RegexAstKind};
 pub(crate) use error::RegexParserError;
 pub(crate) use parser::RegexParser;

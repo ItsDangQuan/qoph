@@ -1,6 +1,6 @@
 use crate::lexer::regex::RegexParser;
 
-use super::ast::{LexerDefinition, LexerRule, PayloadType};
+use super::core::{LexerDefinition, LexerRule, PayloadType};
 use super::error::{DefinitionParserError, DefinitionParserErrorKind, DefinitionParserResult};
 
 pub(crate) struct DefinitionParser<'a> {
@@ -197,7 +197,7 @@ mod tests {
         assert_eq!(rule.variant_name, "Ident");
         assert_eq!(rule.payload, PayloadType::None);
         assert_eq!(rule.priority, 0);
-        assert!(matches!(rule.ast.kind(), RegexAstKind::Literal('a')));
+        assert!(matches!(rule.ast.kind, RegexAstKind::Literal('a')));
     }
 
     #[test]

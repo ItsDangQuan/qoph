@@ -30,13 +30,11 @@ impl RegexParserError {
         Self { kind, location }
     }
 
-    #[allow(unused)]
     /// Returns the error kind.
     pub fn kind(&self) -> &RegexParserErrorKind {
         &self.kind
     }
 
-    #[allow(unused)]
     /// Returns the byte offset at which the error was reported.
     pub fn location(&self) -> usize {
         self.location

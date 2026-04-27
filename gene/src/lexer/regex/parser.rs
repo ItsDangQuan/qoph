@@ -1,4 +1,5 @@
-use super::ast::{CharSet, RegexAst, RegexAstKind};
+use super::charset::CharSet;
+use super::core::{RegexAst, RegexAstKind};
 use super::error::{RegexParserError, RegexParserErrorKind, RegexParserResult};
 
 /// Recursive-descent parser for the regex grammar used in lexer definitions.
@@ -9,7 +10,6 @@ pub(crate) struct RegexParser<'a> {
 }
 
 impl<'a> RegexParser<'a> {
-    #[allow(unused)]
     /// Creates a parser over the supplied input.
     pub(crate) fn new(input: &'a str) -> Self {
         Self {
@@ -83,10 +83,10 @@ impl<'a> RegexParser<'a> {
         while self.expect_char('|') {
             let right = self.parse_concatenation()?;
             let end_loc = self.current_location();
-            left = RegexAst::new(
-                RegexAstKind::Alternation(Box::new(left), Box::new(right)),
-                start_loc..end_loc,
-            )
+            left = RegexAst {
+                kind: RegexAstKind::Alternation(Box::new(left), Box::new(right)),
+                span: start_loc..end_loc,
+            };
         }
 
         Ok(left)
@@ -104,10 +104,10 @@ impl<'a> RegexParser<'a> {
             }
             let right = self.parse_closure()?;
             let end_loc = self.current_location();
-            left = RegexAst::new(
-                RegexAstKind::Concatenation(Box::new(left), Box::new(right)),
-                start_loc..end_loc,
-            )
+            left = RegexAst {
+                kind: RegexAstKind::Concatenation(Box::new(left), Box::new(right)),
+                span: start_loc..end_loc,
+            };
         }
 
         Ok(left)
@@ -124,26 +124,26 @@ impl<'a> RegexParser<'a> {
                 '*' => {
                     self.consume();
                     let end_loc = self.current_location();
-                    return Ok(RegexAst::new(
-                        RegexAstKind::KleeneClosure(Box::new(base)),
-                        start_loc..end_loc,
-                    ));
+                    return Ok(RegexAst {
+                        kind: RegexAstKind::KleeneClosure(Box::new(base)),
+                        span: start_loc..end_loc,
+                    });
                 }
                 '+' => {
                     self.consume();
                     let end_loc = self.current_location();
-                    return Ok(RegexAst::new(
-                        RegexAstKind::PositiveClosure(Box::new(base)),
-                        start_loc..end_loc,
-                    ));
+                    return Ok(RegexAst {
+                        kind: RegexAstKind::PositiveClosure(Box::new(base)),
+                        span: start_loc..end_loc,
+                    });
                 }
                 '?' => {
                     self.consume();
                     let end_loc = self.current_location();
-                    return Ok(RegexAst::new(
-                        RegexAstKind::OptionalClosure(Box::new(base)),
-                        start_loc..end_loc,
-                    ));
+                    return Ok(RegexAst {
+                        kind: RegexAstKind::OptionalClosure(Box::new(base)),
+                        span: start_loc..end_loc,
+                    });
                 }
                 _ => {}
             }
@@ -171,15 +171,24 @@ impl<'a> RegexParser<'a> {
             Some('\\') => {
                 let c = self.parse_escape_sequence()?;
                 let end_loc = self.current_location();
-                Ok(RegexAst::new(RegexAstKind::Literal(c), start_loc..end_loc))
+                Ok(RegexAst {
+                    kind: RegexAstKind::Literal(c),
+                    span: start_loc..end_loc,
+                })
             }
             Some('.') => {
                 let end_loc = self.current_location();
-                Ok(RegexAst::new(RegexAstKind::Wildcard, start_loc..end_loc))
+                Ok(RegexAst {
+                    kind: RegexAstKind::Wildcard,
+                    span: start_loc..end_loc,
+                })
             }
             Some(c) => {
                 let end_loc = self.current_location();
-                Ok(RegexAst::new(RegexAstKind::Literal(c), start_loc..end_loc))
+                Ok(RegexAst {
+                    kind: RegexAstKind::Literal(c),
+                    span: start_loc..end_loc,
+                })
             }
             None => Err(RegexParserError::new(
                 RegexParserErrorKind::UnexpectedEof,
@@ -206,15 +215,15 @@ impl<'a> RegexParser<'a> {
 
                 let charset = CharSet::new(ranges);
                 return if negated {
-                    Ok(RegexAst::new(
-                        RegexAstKind::ComplementClass(charset),
-                        start_loc..end_loc,
-                    ))
+                    Ok(RegexAst {
+                        kind: RegexAstKind::ComplementClass(charset),
+                        span: start_loc..end_loc,
+                    })
                 } else {
-                    Ok(RegexAst::new(
-                        RegexAstKind::CharacterClass(charset),
-                        start_loc..end_loc,
-                    ))
+                    Ok(RegexAst {
+                        kind: RegexAstKind::CharacterClass(charset),
+                        span: start_loc..end_loc,
+                    })
                 };
             }
 
@@ -296,7 +305,7 @@ mod tests {
     }
 
     fn literal(ast: &RegexAst) -> char {
-        match ast.kind() {
+        match &ast.kind {
             RegexAstKind::Literal(c) => *c,
             other => panic!("expected literal, got {other:?}"),
         }
@@ -306,20 +315,20 @@ mod tests {
     fn parses_single_literal() {
         let ast = parse_ok("a");
         assert_eq!(literal(&ast), 'a');
-        assert_eq!(ast.span(), &(0..1));
+        assert_eq!(ast.span, 0..1);
     }
 
     #[test]
     fn parses_unicode_literal_as_single_char() {
         let ast = parse_ok("é");
         assert_eq!(literal(&ast), 'é');
-        assert_eq!(ast.span(), &(0..2));
+        assert_eq!(ast.span, 0..2);
     }
 
     #[test]
     fn parses_wildcard() {
         let ast = parse_ok(".");
-        assert!(matches!(ast.kind(), RegexAstKind::Wildcard));
+        assert!(matches!(ast.kind, RegexAstKind::Wildcard));
     }
 
     #[test]
@@ -334,13 +343,13 @@ mod tests {
     fn alternation_is_left_associative() {
         let ast = parse_ok("a|b|c");
 
-        match ast.kind() {
+        match ast.kind {
             RegexAstKind::Alternation(left, right) => {
-                assert_eq!(literal(right), 'c');
-                match left.kind() {
+                assert_eq!(literal(&right), 'c');
+                match left.kind {
                     RegexAstKind::Alternation(inner_left, inner_right) => {
-                        assert_eq!(literal(inner_left), 'a');
-                        assert_eq!(literal(inner_right), 'b');
+                        assert_eq!(literal(&inner_left), 'a');
+                        assert_eq!(literal(&inner_right), 'b');
                     }
                     other => panic!("expected nested alternation, got {other:?}"),
                 }
@@ -353,13 +362,13 @@ mod tests {
     fn concatenation_binds_tighter_than_alternation() {
         let ast = parse_ok("ab|c");
 
-        match ast.kind() {
+        match ast.kind {
             RegexAstKind::Alternation(left, right) => {
-                assert_eq!(literal(right), 'c');
-                match left.kind() {
+                assert_eq!(literal(&right), 'c');
+                match left.kind {
                     RegexAstKind::Concatenation(inner_left, inner_right) => {
-                        assert_eq!(literal(inner_left), 'a');
-                        assert_eq!(literal(inner_right), 'b');
+                        assert_eq!(literal(&inner_left), 'a');
+                        assert_eq!(literal(&inner_right), 'b');
                     }
                     other => panic!("expected concatenation on left branch, got {other:?}"),
                 }
@@ -372,29 +381,29 @@ mod tests {
     fn parses_concatenation() {
         let ast = parse_ok("(a)b");
 
-        match ast.kind() {
+        match ast.kind {
             RegexAstKind::Concatenation(left, right) => {
-                assert_eq!(literal(left), 'a');
-                assert_eq!(literal(right), 'b');
+                assert_eq!(literal(&left), 'a');
+                assert_eq!(literal(&right), 'b');
             }
             other => panic!("expected concatenation, got {other:?}"),
         }
 
-        assert_eq!(ast.span(), &(0..4));
+        assert_eq!(ast.span, 0..4);
     }
 
     #[test]
     fn parses_closure_operators() {
         assert!(matches!(
-            parse_ok("a*").kind(),
+            parse_ok("a*").kind,
             RegexAstKind::KleeneClosure(_)
         ));
         assert!(matches!(
-            parse_ok("a+").kind(),
+            parse_ok("a+").kind,
             RegexAstKind::PositiveClosure(_)
         ));
         assert!(matches!(
-            parse_ok("a?").kind(),
+            parse_ok("a?").kind,
             RegexAstKind::OptionalClosure(_)
         ));
     }
@@ -402,14 +411,14 @@ mod tests {
     #[test]
     fn parses_grouped_closure() {
         let ast = parse_ok("(ab)*");
-        assert!(matches!(ast.kind(), RegexAstKind::KleeneClosure(_)));
+        assert!(matches!(ast.kind, RegexAstKind::KleeneClosure(_)));
     }
 
     #[test]
     fn parses_character_class_single_and_range() {
         let ast = parse_ok("[a-cx]");
 
-        match ast.kind() {
+        match ast.kind {
             RegexAstKind::CharacterClass(charset) => {
                 assert_eq!(charset.ranges().len(), 2);
                 assert_eq!(charset.ranges()[0], 'a'..='c');
@@ -423,7 +432,7 @@ mod tests {
     fn merges_character_class_ranges() {
         let ast = parse_ok("[a-cb-d]");
 
-        match ast.kind() {
+        match ast.kind {
             RegexAstKind::CharacterClass(charset) => {
                 assert_eq!(charset.ranges().len(), 1);
                 assert_eq!(charset.ranges()[0], 'a'..='d');
@@ -435,13 +444,13 @@ mod tests {
     #[test]
     fn parses_negated_character_class() {
         let ast = parse_ok("[^a-z]");
-        assert!(matches!(ast.kind(), RegexAstKind::ComplementClass(_)));
+        assert!(matches!(ast.kind, RegexAstKind::ComplementClass(_)));
     }
 
     #[test]
     fn parses_hyphen_literal_at_class_end() {
         let ast = parse_ok("[a-]");
-        match ast.kind() {
+        match ast.kind {
             RegexAstKind::CharacterClass(charset) => {
                 assert!(charset.ranges().contains(&('a'..='a')));
                 assert!(charset.ranges().contains(&('-'..='-')));
@@ -453,7 +462,7 @@ mod tests {
     #[test]
     fn parses_escaped_closing_bracket_in_class() {
         let ast = parse_ok("[\\]]");
-        match ast.kind() {
+        match ast.kind {
             RegexAstKind::CharacterClass(charset) => {
                 assert_eq!(charset.ranges().len(), 1);
                 assert_eq!(charset.ranges()[0], ']'..=']');

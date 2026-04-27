@@ -24,7 +24,7 @@ impl NfaBuilder {
     }
 
     pub(crate) fn add_rule(&mut self, ast: &RegexAst, metadata: TokenMetadata) {
-        let (start, _) = self.build_recursive(ast.kind(), metadata);
+        let (start, _) = self.build_recursive(&ast.kind, metadata);
         self.rule_entry_points.push(start);
     }
 
@@ -116,16 +116,16 @@ impl NfaBuilder {
                 self.build_recursive(&positive_ast_kind, metadata)
             }
             RegexAstKind::Concatenation(left, right) => {
-                let (left_start, left_accept) = self.build_recursive(left.kind(), metadata);
-                let (right_start, right_accept) = self.build_recursive(right.kind(), metadata);
+                let (left_start, left_accept) = self.build_recursive(&left.kind, metadata);
+                let (right_start, right_accept) = self.build_recursive(&right.kind, metadata);
 
                 self.states[left_accept].transition = Transition::Epsilon(right_start, None);
 
                 (left_start, right_accept)
             }
             RegexAstKind::Alternation(left, right) => {
-                let (left_start, left_accept) = self.build_recursive(left.kind(), metadata);
-                let (right_start, right_accept) = self.build_recursive(right.kind(), metadata);
+                let (left_start, left_accept) = self.build_recursive(&left.kind, metadata);
+                let (right_start, right_accept) = self.build_recursive(&right.kind, metadata);
 
                 let new_accept = self.add_state(Transition::Accept(metadata));
                 let new_start = self.add_state(Transition::Epsilon(left_start, Some(right_start)));
@@ -136,7 +136,7 @@ impl NfaBuilder {
                 (new_start, new_accept)
             }
             RegexAstKind::KleeneClosure(base) => {
-                let (base_start, base_accept) = self.build_recursive(base.kind(), metadata);
+                let (base_start, base_accept) = self.build_recursive(&base.kind, metadata);
 
                 let new_accept = self.add_state(Transition::Accept(metadata));
                 let new_start = self.add_state(Transition::Epsilon(base_start, Some(new_accept)));
@@ -147,7 +147,7 @@ impl NfaBuilder {
                 (new_start, new_accept)
             }
             RegexAstKind::PositiveClosure(base) => {
-                let (base_start, base_accept) = self.build_recursive(base.kind(), metadata);
+                let (base_start, base_accept) = self.build_recursive(&base.kind, metadata);
 
                 let new_accept = self.add_state(Transition::Accept(metadata));
 
@@ -157,7 +157,7 @@ impl NfaBuilder {
                 (base_start, new_accept)
             }
             RegexAstKind::OptionalClosure(base) => {
-                let (base_start, base_accept) = self.build_recursive(base.kind(), metadata);
+                let (base_start, base_accept) = self.build_recursive(&base.kind, metadata);
 
                 let new_accept = self.add_state(Transition::Accept(metadata));
                 let new_start = self.add_state(Transition::Epsilon(base_start, Some(new_accept)));
