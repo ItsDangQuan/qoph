@@ -1,0 +1,122 @@
+pub(super) const LEXER_BASE: &str = r#"
+// AUTO-GENERATED LEXER
+
+use std::ops::Range;
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum Token<'a> {
+{TOKENS}
+}
+
+const CLASS_MAP: [u8; 256] = [
+{CLASS_MAP}
+];
+
+const TRANSITIONS: [[u16; {NUM_CLASSES}]; {NUM_STATES}] = [
+{TRANSITIONS}
+];
+
+const ACCEPT: [Option<usize>; {NUM_STATES}] = [
+{ACCEPT}
+];
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct LexerError {
+    pub byte_offset: usize,
+}
+
+pub struct Lexer<'a> {
+    input: &'a str,
+    cursor: usize,
+    token_start: usize,
+}
+
+impl<'a> Lexer<'a> {
+    pub fn new(input: &'a str) -> Self {
+        Self {
+            input,
+            cursor: 0,
+            token_start: 0,
+        }
+    }
+
+    pub fn span(&self) -> Range<usize> {
+        self.token_start..self.cursor
+    }
+
+    pub fn slice(&self) -> &'a str {
+        &self.input[self.token_start..self.cursor]
+    }
+
+    pub fn spanned(self) -> SpannedIter<'a> {
+        SpannedIter { lexer: self }
+    }
+}
+
+pub struct SpannedIter<'a> {
+    lexer: Lexer<'a>,
+}
+
+impl<'a> Iterator for SpannedIter<'a> {
+    type Item = (Result<Token<'a>, LexerError>, Range<usize>);
+
+    fn next(&mut self) -> Option<Self::Item> {
+        let token_res = self.lexer.next()?;
+        let span = self.lexer.span();
+        Some((token_res, span))
+    }
+}
+"#;
+
+pub(super) const ITERATOR_IMPL: &str = r#"
+impl<'a> Iterator for Lexer<'a> {
+    type Item = Result<Token<'a>, LexerError>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        if self.cursor >= self.input.len() {
+            return None;
+        }
+
+        let bytes = self.input.as_bytes();
+        self.token_start = self.cursor;
+
+        let mut current_state: u16 = {START_STATE};
+        let mut last_accept_state = None;
+        let mut last_accept_cursor = self.cursor;
+
+        while self.cursor < bytes.len() {
+            let byte = bytes[self.cursor];
+            let class_id = CLASS_MAP[byte as usize];
+            let next_state = TRANSITIONS[current_state as usize][class_id as usize];
+
+            if next_state == 0 {
+                break;
+            }
+
+            current_state = next_state;
+            self.cursor += 1;
+
+            if let Some(rule_id) = ACCEPT[current_state as usize] {
+                last_accept_state = Some(rule_id);
+                last_accept_cursor = self.cursor;
+            }
+        }
+
+        if let Some(rule_id) = last_accept_state {
+            self.cursor = last_accept_cursor;
+            let slice = &self.input[self.token_start..self.cursor];
+
+            let token = match rule_id {
+{MATCH_ARMS}
+                _ => unreachable!(),
+            };
+
+            Some(Ok(token))
+        } else {
+            let next_char = self.input[self.token_start..].chars().next().unwrap();
+            self.cursor = self.token_start + next_char.len_utf8();
+            Some(Err(LexerError { byte_offset: self.token_start }))
+        }
+    }
+}
+"#;

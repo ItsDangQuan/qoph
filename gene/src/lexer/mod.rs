@@ -9,41 +9,29 @@
 
 use std::error::Error;
 
-use codegen::RustEmitter;
+use codegen::CodeEmitter;
 use definition::DefinitionParser;
 use dfa::{DfaBuilder, DfaOptimizer};
-use metadata::TokenMetadata;
 use nfa::NfaBuilder;
+
+use crate::lexer::definition::RuleId;
 
 mod codegen;
 mod definition;
 mod dfa;
-mod metadata;
 mod nfa;
 mod regex;
 
 /// Generates lexer source code from a lexer specification.
-///
-/// Each non-empty, non-comment line in `input` is parsed as:
-///
-/// `TokenName[(str)] ::= <regex>`
-///
-/// where `TokenName` is the emitted enum variant and `(str)` enables
-/// a `&str` payload for that token variant.
-///
 /// Returns an error when definition parsing or regex parsing fails.
 pub fn generate_lexer_source(input: &str) -> Result<String, Box<dyn Error>> {
     let definition_parser = DefinitionParser::new(input);
-    let definition = definition_parser.parse()?;
+    let definition = definition_parser.parse();
 
     let mut nfa_builder = NfaBuilder::new();
 
     for (id, rule) in definition.rules.iter().enumerate() {
-        let metadata = TokenMetadata {
-            priority: rule.priority,
-            id,
-        };
-        nfa_builder.add_rule(&rule.ast, metadata);
+        nfa_builder.add_rule(&rule.ast, RuleId(id));
     }
 
     let master_nfa = nfa_builder.build();
@@ -54,7 +42,7 @@ pub fn generate_lexer_source(input: &str) -> Result<String, Box<dyn Error>> {
     let dfa_optimizer = DfaOptimizer::new(unminimized_dfa);
     let optimized_dfa = dfa_optimizer.optimize();
 
-    let emitter = RustEmitter::new(definition, optimized_dfa);
-    let source = emitter.emit()?;
+    let emitter = CodeEmitter::new(definition, optimized_dfa);
+    let source = emitter.emit();
     Ok(source)
 }

@@ -1,7 +1,7 @@
-use crate::lexer::metadata::TokenMetadata;
+use crate::lexer::definition::RuleId;
 use crate::lexer::regex::RegexAst;
 
-use super::byte::{utf8_expand, wildcard_sequences};
+use super::byte;
 use super::core::{Nfa, NfaState, Transition};
 
 pub(crate) struct NfaBuilder {
@@ -23,8 +23,8 @@ impl NfaBuilder {
         index
     }
 
-    pub(crate) fn add_rule(&mut self, ast: &RegexAst, metadata: TokenMetadata) {
-        let (start, _) = self.build_recursive(ast, metadata);
+    pub(crate) fn add_rule(&mut self, ast: &RegexAst, rule_id: RuleId) {
+        let (start, _) = self.build_recursive(ast, rule_id);
         self.rule_entry_points.push(start);
     }
 
@@ -41,13 +41,13 @@ impl NfaBuilder {
         }
     }
 
-    fn build_recursive(&mut self, kind: &RegexAst, metadata: TokenMetadata) -> (usize, usize) {
+    fn build_recursive(&mut self, kind: &RegexAst, rule_id: RuleId) -> (usize, usize) {
         match kind {
             RegexAst::Literal(c) => {
                 let mut buf = [0; 4];
                 let bytes = c.encode_utf8(&mut buf).as_bytes();
 
-                let accept = self.add_state(Transition::Accept(metadata));
+                let accept = self.add_state(Transition::Accept(rule_id));
 
                 let mut current_target = accept;
                 let mut start_state = accept;
@@ -60,10 +60,10 @@ impl NfaBuilder {
                 (start_state, accept)
             }
             RegexAst::Wildcard => {
-                let accept = self.add_state(Transition::Accept(metadata));
-                let mut branch_starts = Vec::with_capacity(wildcard_sequences().len());
+                let accept = self.add_state(Transition::Accept(rule_id));
+                let mut branch_starts = Vec::with_capacity(byte::wildcard_sequences().len());
 
-                for sequence in wildcard_sequences() {
+                for sequence in byte::wildcard_sequences() {
                     let mut current_target = accept;
                     let mut seq_start = accept;
 
@@ -83,11 +83,11 @@ impl NfaBuilder {
                 (final_start, accept)
             }
             RegexAst::CharacterClass(char_set) => {
-                let accept = self.add_state(Transition::Accept(metadata));
+                let accept = self.add_state(Transition::Accept(rule_id));
                 let mut branch_starts = Vec::new();
 
                 for range in char_set.ranges() {
-                    let byte_sequences = utf8_expand(*range.start(), *range.end());
+                    let byte_sequences = byte::utf8_expand(*range.start(), *range.end());
 
                     for sequence in byte_sequences {
                         let mut current_target = accept;
@@ -113,21 +113,21 @@ impl NfaBuilder {
                 let inverted_set = char_set.complement();
                 let positive_ast_kind = RegexAst::CharacterClass(inverted_set);
 
-                self.build_recursive(&positive_ast_kind, metadata)
+                self.build_recursive(&positive_ast_kind, rule_id)
             }
             RegexAst::Concatenation(left, right) => {
-                let (left_start, left_accept) = self.build_recursive(left, metadata);
-                let (right_start, right_accept) = self.build_recursive(right, metadata);
+                let (left_start, left_accept) = self.build_recursive(left, rule_id);
+                let (right_start, right_accept) = self.build_recursive(right, rule_id);
 
                 self.states[left_accept].transition = Transition::Epsilon(right_start, None);
 
                 (left_start, right_accept)
             }
             RegexAst::Alternation(left, right) => {
-                let (left_start, left_accept) = self.build_recursive(left, metadata);
-                let (right_start, right_accept) = self.build_recursive(right, metadata);
+                let (left_start, left_accept) = self.build_recursive(left, rule_id);
+                let (right_start, right_accept) = self.build_recursive(right, rule_id);
 
-                let new_accept = self.add_state(Transition::Accept(metadata));
+                let new_accept = self.add_state(Transition::Accept(rule_id));
                 let new_start = self.add_state(Transition::Epsilon(left_start, Some(right_start)));
 
                 self.states[left_accept].transition = Transition::Epsilon(new_accept, None);
@@ -136,9 +136,9 @@ impl NfaBuilder {
                 (new_start, new_accept)
             }
             RegexAst::KleeneClosure(base) => {
-                let (base_start, base_accept) = self.build_recursive(base, metadata);
+                let (base_start, base_accept) = self.build_recursive(base, rule_id);
 
-                let new_accept = self.add_state(Transition::Accept(metadata));
+                let new_accept = self.add_state(Transition::Accept(rule_id));
                 let new_start = self.add_state(Transition::Epsilon(base_start, Some(new_accept)));
 
                 self.states[base_accept].transition =
@@ -147,9 +147,9 @@ impl NfaBuilder {
                 (new_start, new_accept)
             }
             RegexAst::PositiveClosure(base) => {
-                let (base_start, base_accept) = self.build_recursive(base, metadata);
+                let (base_start, base_accept) = self.build_recursive(base, rule_id);
 
-                let new_accept = self.add_state(Transition::Accept(metadata));
+                let new_accept = self.add_state(Transition::Accept(rule_id));
 
                 self.states[base_accept].transition =
                     Transition::Epsilon(base_start, Some(new_accept));
@@ -157,9 +157,9 @@ impl NfaBuilder {
                 (base_start, new_accept)
             }
             RegexAst::OptionalClosure(base) => {
-                let (base_start, base_accept) = self.build_recursive(base, metadata);
+                let (base_start, base_accept) = self.build_recursive(base, rule_id);
 
-                let new_accept = self.add_state(Transition::Accept(metadata));
+                let new_accept = self.add_state(Transition::Accept(rule_id));
                 let new_start = self.add_state(Transition::Epsilon(base_start, Some(new_accept)));
 
                 self.states[base_accept].transition = Transition::Epsilon(new_accept, None);
@@ -202,7 +202,7 @@ impl NfaBuilder {
 
 #[cfg(test)]
 mod tests {
-    use crate::lexer::metadata::TokenMetadata;
+    use crate::lexer::definition::RuleId;
     use crate::lexer::regex::RegexParser;
 
     use super::{NfaBuilder, Transition};
@@ -219,15 +219,12 @@ mod tests {
     }
 
     #[test]
-    fn literal_rule_emits_match_then_accept_with_metadata() {
+    fn literal_rule_emits_match_then_accept_with_rule_id() {
         let ast = parse_regex("a");
-        let metadata = TokenMetadata {
-            priority: 0,
-            id: 42,
-        };
+        let rule_id = RuleId(0);
 
         let mut builder = NfaBuilder::new();
-        builder.add_rule(&ast, metadata);
+        builder.add_rule(&ast, rule_id);
         let nfa = builder.build();
 
         let start = nfa.start;
@@ -235,7 +232,7 @@ mod tests {
             Transition::MatchRange(s, e, next) => {
                 assert_eq!((s, e), (b'a', b'a'));
                 match nfa.states[next].transition {
-                    Transition::Accept(m) => assert_eq!(m, metadata),
+                    Transition::Accept(m) => assert_eq!(m, rule_id),
                     _ => panic!("expected accept state"),
                 }
             }
@@ -248,7 +245,7 @@ mod tests {
         let ast = parse_regex("[]");
 
         let mut builder = NfaBuilder::new();
-        builder.add_rule(&ast, TokenMetadata { priority: 0, id: 0 });
+        builder.add_rule(&ast, RuleId(0));
         let nfa = builder.build();
 
         assert!(matches!(
@@ -263,8 +260,8 @@ mod tests {
         let b = parse_regex("b");
 
         let mut builder = NfaBuilder::new();
-        builder.add_rule(&a, TokenMetadata { priority: 0, id: 0 });
-        builder.add_rule(&b, TokenMetadata { priority: 0, id: 1 });
+        builder.add_rule(&a, RuleId(0));
+        builder.add_rule(&b, RuleId(1));
 
         let nfa = builder.build();
         assert!(matches!(

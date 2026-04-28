@@ -7,5 +7,6 @@
 
 mod compressor;
 mod emitter;
+mod template;
 
-pub(crate) use emitter::RustEmitter;
+pub(crate) use emitter::CodeEmitter;

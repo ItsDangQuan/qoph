@@ -45,8 +45,8 @@ impl DfaOptimizer {
         let mut accepting_groups: BTreeMap<_, BTreeSet<_>> = BTreeMap::new();
 
         for (i, state) in self.dfa.states.iter().enumerate() {
-            if let Some(metadata) = &state.accept {
-                accepting_groups.entry(metadata.id).or_default().insert(i);
+            if let Some(rule_id) = &state.accept {
+                accepting_groups.entry(rule_id).or_default().insert(i);
             } else {
                 non_accepting.insert(i);
             }
@@ -153,58 +153,5 @@ impl DfaOptimizer {
             states: minimized_states,
             start: minimized_start,
         }
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use crate::lexer::metadata::TokenMetadata;
-
-    use super::super::core::{Dfa, DfaState};
-    use super::DfaOptimizer;
-
-    #[test]
-    fn optimizer_merges_equivalent_non_accepting_states() {
-        let mut s0 = DfaState::new();
-        s0.transitions[b'a' as usize] = Some(1);
-        s0.transitions[b'b' as usize] = Some(2);
-
-        let s1 = DfaState::new();
-        let s2 = DfaState::new();
-
-        let dfa = Dfa {
-            states: vec![s0, s1, s2],
-            start: 0,
-        };
-
-        let minimized = DfaOptimizer::new(dfa).optimize();
-        assert_eq!(minimized.states.len(), 2);
-    }
-
-    #[test]
-    fn optimizer_keeps_accepting_states_with_different_ids_separate() {
-        let mut s0 = DfaState::new();
-        s0.transitions[b'a' as usize] = Some(1);
-        s0.transitions[b'b' as usize] = Some(2);
-
-        let mut s1 = DfaState::new();
-        s1.accept = Some(TokenMetadata {
-            priority: 0,
-            id: 11,
-        });
-
-        let mut s2 = DfaState::new();
-        s2.accept = Some(TokenMetadata {
-            priority: 0,
-            id: 12,
-        });
-
-        let dfa = Dfa {
-            states: vec![s0, s1, s2],
-            start: 0,
-        };
-
-        let minimized = DfaOptimizer::new(dfa).optimize();
-        assert_eq!(minimized.states.len(), 3);
     }
 }

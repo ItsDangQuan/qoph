@@ -12,7 +12,5 @@ Semi ::= ;
 
 // 4. Dynamic Payloads
 Identifier(str) ::= [a-zA-Z_][a-zA-Z0-9_]*
-
-// 5. The Raw Regex String (Bootstrap Correction)
-// Utilizing backticks to guarantee double-quotes can exist safely inside the payload.
 RawRegex(str) ::= r#`[^`]*`#
+CodeBlock(str) ::= c#`[^`]*`#

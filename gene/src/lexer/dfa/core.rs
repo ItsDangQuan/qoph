@@ -1,8 +1,8 @@
-use crate::lexer::metadata::TokenMetadata;
+use crate::lexer::definition::RuleId;
 
 pub(crate) struct DfaState {
     pub(crate) transitions: [Option<usize>; 256],
-    pub(crate) accept: Option<TokenMetadata>,
+    pub(crate) accept: Option<RuleId>,
 }
 
 impl Default for DfaState {

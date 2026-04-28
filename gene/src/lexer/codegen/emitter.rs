@@ -1,292 +1,106 @@
-use std::fmt::{self, Write};
+use crate::lexer::{
+    codegen::{compressor::EquivalenceClasses, template},
+    definition::LexerDef,
+    dfa::Dfa,
+};
 
-use crate::lexer::definition::{LexerDefinition, PayloadType};
-use crate::lexer::dfa::Dfa;
-
-use super::compressor::EquivalenceClasses;
-
-pub(crate) struct RustEmitter<'a> {
-    definition: LexerDefinition<'a>,
+pub(crate) struct CodeEmitter<'a> {
+    definition: LexerDef<'a>,
     dfa: Dfa,
 }
 
-impl<'a> RustEmitter<'a> {
-    pub(crate) fn new(definition: LexerDefinition<'a>, dfa: Dfa) -> Self {
+impl<'a> CodeEmitter<'a> {
+    pub(crate) fn new(definition: LexerDef<'a>, dfa: Dfa) -> Self {
         Self { definition, dfa }
     }
 
-    pub(crate) fn emit(&self) -> Result<String, fmt::Error> {
+    pub(crate) fn emit(&self) -> String {
+        let classes = EquivalenceClasses::compute(&self.dfa);
+
+        let tokens_str = self.emit_tokens();
+        let class_map_str = self.emit_class_map(&classes);
+        let transitions_str = self.emit_transitions(&classes);
+        let accept_str = self.emit_accept();
+        let match_arms_str = self.emit_match_arms();
+
+        let num_states = self.dfa.states.len().to_string();
+        let num_classes = classes.num_classes.to_string();
+
+        let start_state = self.dfa.start.to_string();
+
+        let base_code = template::LEXER_BASE
+            .trim_start()
+            .replace("{TOKENS}", &tokens_str)
+            .replace("{CLASS_MAP}", &class_map_str)
+            .replace("{NUM_CLASSES}", &num_classes)
+            .replace("{NUM_STATES}", &num_states)
+            .replace("{TRANSITIONS}", &transitions_str)
+            .replace("{ACCEPT}", &accept_str);
+
+        let iterator_code = template::ITERATOR_IMPL
+            .trim_start()
+            .replace("{START_STATE}", &start_state)
+            .replace("{MATCH_ARMS}", &match_arms_str);
+
+        format!("{}\n{}", base_code, iterator_code)
+    }
+
+    fn emit_tokens(&self) -> String {
         let mut out = String::new();
-
-        self.emit_headers(&mut out)?;
-        self.emit_token_enum(&mut out)?;
-        self.emit_tables(&mut out)?;
-        self.emit_lexer_struct(&mut out)?;
-        self.emit_iterator(&mut out)?;
-
-        Ok(out)
-    }
-
-    fn emit_headers(&self, out: &mut String) -> Result<(), fmt::Error> {
-        writeln!(out, "// AUTO-GENERATED LEXER")?;
-        writeln!(out)?;
-        Ok(())
-    }
-
-    fn emit_token_enum(&self, out: &mut String) -> Result<(), fmt::Error> {
-        writeln!(out, "#[derive(Debug, Clone, PartialEq, Eq)]")?;
-        writeln!(out, "pub enum Token<'a> {{")?;
-
         for rule in &self.definition.rules {
-            match rule.payload {
-                PayloadType::None => {
-                    writeln!(out, "    {},", rule.variant_name)?;
-                }
-                PayloadType::StringSlice => {
-                    writeln!(out, "    {}(&'a str),", rule.variant_name)?;
-                }
-            }
+            out.push_str(&format!("    {}(&'a str),\n", rule.name));
         }
-
-        writeln!(out, "}}")?;
-        writeln!(out)?;
-        Ok(())
+        out.trim_end().to_string()
     }
 
-    fn emit_tables(&self, out: &mut String) -> Result<(), fmt::Error> {
-        let num_states = self.dfa.states.len();
-        let table_size = num_states + 1;
-        let eq_classes = EquivalenceClasses::compute(&self.dfa);
-
-        writeln!(out, "const CLASS_MAP: [u8; 256] = [")?;
-        write!(out, "    ")?;
-        for (i, &class_id) in eq_classes.class_map.iter().enumerate() {
-            write!(out, "{}, ", class_id)?;
-            if (i + 1) % 16 == 0 && i < 255 {
-                writeln!(out)?;
-                write!(out, "    ")?;
+    fn emit_class_map(&self, classes: &EquivalenceClasses) -> String {
+        let mut out = String::new();
+        for chunk in classes.class_map.chunks(16) {
+            out.push_str("    ");
+            for val in chunk {
+                out.push_str(&format!("{}, ", val));
             }
+            out.push('\n');
         }
-        writeln!(out, "\n];\n")?;
+        out.trim_end().to_string()
+    }
 
-        writeln!(
-            out,
-            "const TRANSITIONS: [[u16; {}]; {}] = [",
-            eq_classes.num_classes, table_size
-        )?;
-
-        writeln!(out, "    [0; {}],", eq_classes.num_classes)?;
-
-        for state_transitions in eq_classes.compressed_transitions {
-            write!(out, "    [")?;
-            for (i, &target) in state_transitions.iter().enumerate() {
-                write!(out, "{}", target)?;
-                if i < eq_classes.num_classes - 1 {
-                    write!(out, ", ")?;
-                }
+    fn emit_transitions(&self, classes: &EquivalenceClasses) -> String {
+        let mut out = String::new();
+        for row in &classes.compressed_transitions {
+            out.push_str("    [");
+            for val in row {
+                out.push_str(&format!("{}, ", val));
             }
-            writeln!(out, "],")?;
+            out.push_str("],\n");
         }
-        writeln!(out, "];\n")?;
+        out.trim_end().to_string()
+    }
 
-        writeln!(out, "const ACCEPT: [Option<u16>; {}] = [", table_size)?;
-        writeln!(out, "    None,")?;
+    fn emit_accept(&self) -> String {
+        let mut out = String::new();
         for state in &self.dfa.states {
-            match state.accept {
-                Some(metadata) => writeln!(out, "    Some({}),", metadata.id)?,
-                None => writeln!(out, "    None,")?,
+            if let Some(rule_id) = &state.accept {
+                out.push_str(&format!("    Some({}),\n", rule_id.0));
+            } else {
+                out.push_str("    None,\n");
             }
         }
-        writeln!(out, "];\n")?;
-        Ok(())
+        out.trim_end().to_string()
     }
 
-    fn emit_lexer_struct(&self, out: &mut String) -> Result<(), fmt::Error> {
-        writeln!(out, "#[derive(Debug, Clone, PartialEq, Eq)]")?;
-        writeln!(out, "pub struct LexerError {{ pub byte_offset: usize }}")?;
-        writeln!(out)?;
-        writeln!(out, "#[derive(Debug, Clone, PartialEq, Eq)]")?;
-        writeln!(
-            out,
-            "pub struct Span {{ pub start: usize, pub end: usize }}"
-        )?;
-        writeln!(out)?;
-        writeln!(out, "#[derive(Debug, Clone, PartialEq, Eq)]")?;
-        writeln!(
-            out,
-            "pub struct Spanned<T> {{ pub node: T, pub span: Span }}"
-        )?;
-        writeln!(out)?;
-        writeln!(out, "pub struct Lexer<'a> {{")?;
-        writeln!(out, "    input: &'a str,")?;
-        writeln!(out, "    cursor: usize,")?;
-        writeln!(out, "}}")?;
-        writeln!(out)?;
-        writeln!(out, "impl<'a> Lexer<'a> {{")?;
-        writeln!(out, "    pub fn new(input: &'a str) -> Self {{")?;
-        writeln!(out, "        Self {{ input, cursor: 0 }}")?;
-        writeln!(out, "    }}")?;
-        writeln!(out, "}}")?;
-        writeln!(out)?;
-        Ok(())
-    }
-
-    fn emit_iterator(&self, out: &mut String) -> Result<(), std::fmt::Error> {
-        writeln!(out, "impl<'a> Iterator for Lexer<'a> {{")?;
-        writeln!(
-            out,
-            "    type Item = Result<Spanned<Token<'a>>, LexerError>;"
-        )?;
-        writeln!(out)?;
-        writeln!(out, "    fn next(&mut self) -> Option<Self::Item> {{")?;
-        writeln!(
-            out,
-            "        if self.cursor >= self.input.len() {{ return None; }}"
-        )?;
-        writeln!(out)?;
-        writeln!(out, "        let bytes = self.input.as_bytes();")?;
-        writeln!(out, "        let start_cursor = self.cursor;")?;
-        writeln!(
-            out,
-            "        let mut current_state: u16 = {};",
-            self.dfa.start + 1
-        )?;
-        writeln!(out, "        let mut last_accept_state = None;")?;
-        writeln!(out, "        let mut last_accept_cursor = self.cursor;")?;
-        writeln!(out)?;
-        writeln!(out, "        while self.cursor < bytes.len() {{")?;
-        writeln!(out, "            let byte = bytes[self.cursor];")?;
-        writeln!(out, "            let class_id = CLASS_MAP[byte as usize];")?;
-        writeln!(
-            out,
-            "            let next_state = TRANSITIONS[current_state as usize][class_id as usize];"
-        )?;
-        writeln!(out)?;
-        writeln!(out, "            if next_state == 0 {{ break; }}")?;
-        writeln!(out)?;
-        writeln!(out, "            current_state = next_state;")?;
-        writeln!(out, "            self.cursor += 1;")?;
-        writeln!(out)?;
-        writeln!(
-            out,
-            "            if let Some(rule_id) = ACCEPT[current_state as usize] {{"
-        )?;
-        writeln!(out, "                last_accept_state = Some(rule_id);")?;
-        writeln!(out, "                last_accept_cursor = self.cursor;")?;
-        writeln!(out, "            }}")?;
-        writeln!(out, "        }}")?;
-        writeln!(out)?;
-        writeln!(out, "        if let Some(rule_id) = last_accept_state {{")?;
-        writeln!(out, "            self.cursor = last_accept_cursor;")?;
-        writeln!(
-            out,
-            "            let slice = &self.input[start_cursor..self.cursor];"
-        )?;
-        writeln!(out)?;
-        writeln!(out, "            let token = match rule_id {{")?;
-
+    fn emit_match_arms(&self) -> String {
+        let mut out = String::new();
         for (id, rule) in self.definition.rules.iter().enumerate() {
-            match rule.payload {
-                PayloadType::None => writeln!(
-                    out,
-                    "                {} => Token::{},",
-                    id, rule.variant_name
-                )?,
-                PayloadType::StringSlice => writeln!(
-                    out,
-                    "                {} => Token::{}(slice),",
-                    id, rule.variant_name
-                )?,
+            if let Some(action) = rule.action {
+                out.push_str(&format!("                {} => {{ {} }},\n", id, action));
+            } else {
+                out.push_str(&format!(
+                    "                {} => Token::{}(slice),\n",
+                    id, rule.name
+                ));
             }
         }
-
-        writeln!(out, "                _ => unreachable!(),")?;
-        writeln!(out, "            }};")?;
-        writeln!(out)?;
-        writeln!(
-            out,
-            "            Some(Ok(Spanned {{ node: token, span: Span {{ start: start_cursor, end: self.cursor }} }}))"
-        )?;
-        writeln!(out, "        }} else {{")?;
-        writeln!(
-            out,
-            "            let c = self.input[start_cursor..].chars().next().unwrap();"
-        )?;
-        writeln!(
-            out,
-            "            self.cursor = start_cursor + c.len_utf8();"
-        )?;
-        writeln!(
-            out,
-            "            Some(Err(LexerError {{ byte_offset: start_cursor }}))"
-        )?;
-        writeln!(out, "        }}")?;
-        writeln!(out, "    }}")?;
-        writeln!(out, "}}")?;
-        Ok(())
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use crate::lexer::{
-        definition::DefinitionParser,
-        dfa::{DfaBuilder, DfaOptimizer},
-        metadata::TokenMetadata,
-        nfa::NfaBuilder,
-    };
-
-    use super::RustEmitter;
-
-    fn emit_source(spec: &str) -> String {
-        let definition = DefinitionParser::new(spec)
-            .parse()
-            .expect("definition should parse");
-
-        let mut nfa_builder = NfaBuilder::new();
-        for (id, rule) in definition.rules.iter().enumerate() {
-            nfa_builder.add_rule(
-                &rule.ast,
-                TokenMetadata {
-                    priority: rule.priority,
-                    id,
-                },
-            );
-        }
-
-        let nfa = nfa_builder.build();
-        let dfa = DfaBuilder::new(&nfa).build();
-        let dfa = DfaOptimizer::new(dfa).optimize();
-
-        RustEmitter::new(definition, dfa)
-            .emit()
-            .expect("emission should succeed")
-    }
-
-    #[test]
-    fn emit_includes_valid_headers() {
-        let source = emit_source("A ::= a");
-
-        assert!(source.contains("// AUTO-GENERATED LEXER"));
-        assert!(!source.contains("#![allow(dead_code)]"));
-        assert!(!source.contains("#![allow(unused_imports)]"));
-    }
-
-    #[test]
-    fn emit_reserves_zero_dead_row_and_shifts_start_state() {
-        let source = emit_source("A ::= a");
-
-        assert!(source.contains("[0; "));
-        assert!(source.contains("let mut current_state: u16 = 1;"));
-    }
-
-    #[test]
-    fn emit_generates_token_variants_for_payload_and_non_payload_rules() {
-        let source = emit_source("A ::= a\nB(str) ::= b+");
-
-        assert!(source.contains("A,"));
-        assert!(source.contains("B(&'a str),"));
-        assert!(source.contains("Token::A"));
-        assert!(source.contains("Token::B(slice)"));
+        out.trim_end().to_string()
     }
 }

@@ -1,9 +1,9 @@
-use crate::lexer::metadata::TokenMetadata;
+use crate::lexer::definition::RuleId;
 
 pub(crate) enum Transition {
     Epsilon(usize, Option<usize>),
     MatchRange(u8, u8, usize),
-    Accept(TokenMetadata),
+    Accept(RuleId),
     DeadEnd,
 }
 
