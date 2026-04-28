@@ -88,7 +88,7 @@ impl<'a> DefinitionParser<'a> {
         );
     }
 
-    fn parse_rule_decl(&mut self) {
+    fn parse_rule_decl(&mut self, skip: bool) {
         let ident_str = match self.advance().unwrap().node {
             Token::Identifier(name) => name,
             found => panic!("Expected Identifier, found {:?}", found),
@@ -126,6 +126,7 @@ impl<'a> DefinitionParser<'a> {
             name: ident_str,
             ast,
             action,
+            skip,
         });
     }
 
@@ -138,7 +139,12 @@ impl<'a> DefinitionParser<'a> {
                 }
                 Token::RuleKw => {
                     self.advance();
-                    self.parse_rule_decl();
+                    self.parse_rule_decl(false);
+                }
+                Token::SkipKw => {
+                    self.advance();
+                    self.expect(Token::RuleKw);
+                    self.parse_rule_decl(true);
                 }
                 _ => panic!("Expected 'let' or 'rule', found {:?}", peeked.node),
             }

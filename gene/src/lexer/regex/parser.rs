@@ -285,7 +285,7 @@ impl<'a> RegexParser<'a> {
 mod tests {
     use super::*;
 
-    fn parse_ok(input: &str) -> RegexAst {
+    fn parse_ok<'a>(input: &'a str) -> RegexAst<'a> {
         RegexParser::new(input, 0)
             .parse()
             .expect("regex should parse")

@@ -23,10 +23,10 @@ impl<'a> CodeEmitter<'a> {
         let accept_str = self.emit_accept();
         let match_arms_str = self.emit_match_arms();
 
-        let num_states = self.dfa.states.len().to_string();
+        let num_states = (self.dfa.states.len() + 1).to_string();
         let num_classes = classes.num_classes.to_string();
 
-        let start_state = self.dfa.start.to_string();
+        let start_state = (self.dfa.start + 1).to_string();
 
         let base_code = template::LEXER_BASE
             .trim_start()
@@ -48,7 +48,9 @@ impl<'a> CodeEmitter<'a> {
     fn emit_tokens(&self) -> String {
         let mut out = String::new();
         for rule in &self.definition.rules {
-            out.push_str(&format!("    {}(&'a str),\n", rule.name));
+            if !rule.skip {
+                out.push_str(&format!("    {}(&'a str),\n", rule.name));
+            }
         }
         out.trim_end().to_string()
     }
@@ -67,6 +69,7 @@ impl<'a> CodeEmitter<'a> {
 
     fn emit_transitions(&self, classes: &EquivalenceClasses) -> String {
         let mut out = String::new();
+        out.push_str(&format!("    [0; {}],\n", classes.num_classes));
         for row in &classes.compressed_transitions {
             out.push_str("    [");
             for val in row {
@@ -79,6 +82,7 @@ impl<'a> CodeEmitter<'a> {
 
     fn emit_accept(&self) -> String {
         let mut out = String::new();
+        out.push_str("    None,\n");
         for state in &self.dfa.states {
             if let Some(rule_id) = &state.accept {
                 out.push_str(&format!("    Some({}),\n", rule_id.0));
@@ -92,7 +96,12 @@ impl<'a> CodeEmitter<'a> {
     fn emit_match_arms(&self) -> String {
         let mut out = String::new();
         for (id, rule) in self.definition.rules.iter().enumerate() {
-            if let Some(action) = rule.action {
+            if rule.skip {
+                out.push_str(&format!(
+                    "                {} => {{ return self.next(); }},\n",
+                    id
+                ));
+            } else if let Some(action) = rule.action {
                 out.push_str(&format!("                {} => {{ {} }},\n", id, action));
             } else {
                 out.push_str(&format!(

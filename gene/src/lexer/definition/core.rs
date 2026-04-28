@@ -25,6 +25,7 @@ pub(crate) struct TokenRule<'a> {
     pub(crate) ast: RegexAst<'a>,
     /// The optional Rust code block (escape hatch) for context-sensitive evaluation.
     pub(crate) action: Option<&'a str>,
+    pub(crate) skip: bool,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]

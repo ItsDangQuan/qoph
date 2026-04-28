@@ -1,16 +1,14 @@
-// 1. Ignored/Trivia Tokens
 Whitespace ::= [ \t\n\r]+
 Comment ::= #[^\n]*
 
-// 2. Keywords
 LetKw ::= let
 RuleKw ::= rule
+SkipKw ::= skip
 
-// 3. Punctuation
 Assign ::= =
 Semi ::= ;
 
-// 4. Dynamic Payloads
 Identifier(str) ::= [a-zA-Z_][a-zA-Z0-9_]*
+
 RawRegex(str) ::= r#`[^`]*`#
 CodeBlock(str) ::= c#`[^`]*`#
