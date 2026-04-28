@@ -1,4 +1,4 @@
-// AUTO-GENERATED LEXER
+use std::ops::Range;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Token<'a> {
@@ -14,218 +14,172 @@ pub enum Token<'a> {
     CodeBlock(&'a str),
 }
 
-const CLASS_MAP: [u8; 256] = [
-    0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 2, 0, 0, 3, 0, 0, 
-    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 
-    1, 0, 0, 4, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 
-    5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 0, 6, 0, 7, 0, 0, 
-    0, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 
-    8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 0, 0, 0, 0, 8, 
-    9, 8, 8, 10, 8, 11, 8, 8, 8, 12, 8, 13, 14, 8, 8, 8, 
-    15, 8, 16, 17, 18, 19, 8, 8, 8, 8, 8, 0, 0, 0, 0, 0, 
-    20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 
-    21, 21, 21, 21, 21, 21, 21, 21, 21, 21, 21, 21, 21, 21, 21, 21, 
-    22, 22, 22, 22, 22, 22, 22, 22, 22, 22, 22, 22, 22, 22, 22, 22, 
-    22, 22, 22, 22, 22, 22, 22, 22, 22, 22, 22, 22, 22, 22, 22, 22, 
-    23, 23, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 
-    24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 
-    25, 26, 26, 26, 26, 26, 26, 26, 26, 26, 26, 26, 26, 27, 26, 26, 
-    28, 29, 29, 29, 30, 23, 23, 23, 23, 23, 23, 23, 23, 23, 23, 23, 
-];
-
-const TRANSITIONS: [[u16; 31]; 58] = [
-    [0; 31],
-    [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 22, 22, 22, 0, 0, 0, 0, 0, 0, 0, 0],
-    [0, 13, 13, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-    [22, 22, 0, 3, 22, 22, 22, 22, 22, 22, 22, 22, 22, 22, 22, 22, 22, 22, 22, 22, 0, 0, 0, 0, 1, 41, 40, 39, 48, 47, 46],
-    [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-    [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-    [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-    [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-    [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-    [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-    [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-    [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-    [12, 12, 0, 12, 12, 12, 12, 12, 12, 14, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 0, 0, 0, 0, 31, 20, 21, 19, 34, 35, 18],
-    [0, 13, 13, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-    [0, 0, 0, 0, 29, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-    [0, 0, 0, 9, 0, 32, 0, 0, 32, 0, 32, 24, 32, 32, 32, 32, 32, 32, 32, 32, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-    [0, 0, 0, 9, 30, 32, 0, 0, 32, 0, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-    [0, 13, 13, 13, 22, 0, 27, 26, 32, 0, 16, 32, 32, 32, 43, 32, 42, 49, 32, 32, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-    [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 21, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-    [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 31, 31, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-    [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 31, 0, 0, 0, 0, 0, 0, 0, 0],
-    [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 31, 31, 31, 0, 0, 0, 0, 0, 0, 0, 0],
-    [22, 22, 0, 3, 22, 22, 22, 22, 22, 22, 22, 22, 22, 22, 22, 22, 22, 22, 22, 22, 0, 0, 0, 0, 1, 41, 40, 39, 48, 47, 46],
-    [0, 0, 0, 4, 0, 32, 0, 0, 32, 0, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-    [0, 0, 0, 5, 0, 32, 0, 0, 32, 0, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-    [0, 0, 0, 6, 0, 32, 0, 0, 32, 0, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-    [0, 0, 0, 7, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-    [0, 0, 0, 8, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-    [0, 0, 0, 10, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-    [0, 0, 0, 11, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-    [0, 0, 0, 0, 0, 0, 0, 0, 0, 12, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-    [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 12, 12, 12, 0, 0, 0, 0, 0, 0, 0, 0],
-    [0, 0, 0, 9, 0, 32, 0, 0, 32, 0, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-    [0, 0, 0, 9, 0, 32, 0, 0, 32, 0, 32, 32, 32, 32, 15, 32, 32, 32, 32, 32, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-    [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 21, 21, 0, 0, 0, 0, 0, 0, 0, 0],
-    [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 21, 21, 21, 0, 0, 0, 0, 0, 0, 0, 0],
-    [0, 0, 0, 9, 0, 32, 0, 0, 32, 0, 32, 32, 32, 32, 32, 32, 32, 32, 23, 32, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-    [0, 0, 0, 9, 0, 32, 0, 0, 32, 0, 32, 32, 32, 32, 32, 25, 32, 32, 32, 32, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-    [0, 0, 0, 0, 28, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-    [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-    [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0],
-    [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0],
-    [0, 0, 0, 9, 50, 32, 0, 0, 32, 0, 32, 32, 32, 32, 32, 32, 32, 32, 32, 33, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-    [0, 0, 0, 9, 0, 32, 0, 0, 32, 0, 32, 36, 32, 32, 32, 32, 32, 32, 32, 32, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-    [0, 0, 0, 9, 0, 32, 0, 0, 32, 0, 32, 32, 37, 32, 32, 32, 32, 32, 32, 32, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-    [45, 45, 0, 45, 45, 45, 45, 45, 45, 38, 45, 45, 45, 45, 45, 45, 45, 45, 45, 45, 0, 0, 0, 0, 51, 54, 53, 52, 57, 56, 55],
-    [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 40, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-    [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 40, 40, 40, 0, 0, 0, 0, 0, 0, 0, 0],
-    [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 40, 40, 0, 0, 0, 0, 0, 0, 0, 0],
-    [0, 0, 0, 9, 0, 32, 0, 0, 32, 0, 32, 32, 32, 44, 32, 32, 32, 32, 32, 32, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-    [0, 0, 0, 0, 0, 0, 0, 0, 0, 45, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-    [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 45, 45, 45, 0, 0, 0, 0, 0, 0, 0, 0],
-    [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 51, 51, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-    [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 51, 51, 51, 0, 0, 0, 0, 0, 0, 0, 0],
-    [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 51, 0, 0, 0, 0, 0, 0, 0, 0],
-    [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 53, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-    [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 53, 53, 53, 0, 0, 0, 0, 0, 0, 0, 0],
-    [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 53, 53, 0, 0, 0, 0, 0, 0, 0, 0],
-];
-
-const ACCEPT: [Option<u16>; 58] = [
-    None,
-    None,
-    Some(0),
-    Some(1),
-    Some(2),
-    Some(3),
-    Some(4),
-    Some(5),
-    Some(6),
-    Some(7),
-    Some(8),
-    Some(9),
-    None,
-    None,
-    None,
-    None,
-    None,
-    None,
-    None,
-    None,
-    None,
-    None,
-    None,
-    None,
-    None,
-    None,
-    None,
-    None,
-    None,
-    None,
-    None,
-    None,
-    None,
-    None,
-    None,
-    None,
-    None,
-    None,
-    None,
-    None,
-    None,
-    None,
-    None,
-    None,
-    None,
-    None,
-    None,
-    None,
-    None,
-    None,
-    None,
-    None,
-    None,
-    None,
-    None,
-    None,
-    None,
-    None,
-];
-
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct LexerError { pub byte_offset: usize }
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct Span { pub start: usize, pub end: usize }
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct Spanned<T> { pub node: T, pub span: Span }
+pub struct LexerError {
+    pub byte_offset: usize,
+}
 
 pub struct Lexer<'a> {
     input: &'a str,
     cursor: usize,
+    token_start: usize,
 }
 
 impl<'a> Lexer<'a> {
     pub fn new(input: &'a str) -> Self {
-        Self { input, cursor: 0 }
+        Self {
+            input,
+            cursor: 0,
+            token_start: 0,
+        }
+    }
+
+    pub fn span(&self) -> Range<usize> {
+        self.token_start..self.cursor
+    }
+
+    pub fn slice(&self) -> &'a str {
+        &self.input[self.token_start..self.cursor]
+    }
+
+    pub fn spanned(self) -> SpannedIter<'a> {
+        SpannedIter { lexer: self }
+    }
+}
+
+pub struct SpannedIter<'a> {
+    lexer: Lexer<'a>,
+}
+
+impl<'a> Iterator for SpannedIter<'a> {
+    type Item = (Result<Token<'a>, LexerError>, Range<usize>);
+
+    fn next(&mut self) -> Option<Self::Item> {
+        let token_res = self.lexer.next()?;
+        let span = self.lexer.span();
+        Some((token_res, span))
     }
 }
 
 impl<'a> Iterator for Lexer<'a> {
-    type Item = Result<Spanned<Token<'a>>, LexerError>;
+    type Item = Result<Token<'a>, LexerError>;
 
     fn next(&mut self) -> Option<Self::Item> {
-        if self.cursor >= self.input.len() { return None; }
+        if self.cursor >= self.input.len() {
+            return None;
+        }
 
+        self.token_start = self.cursor;
         let bytes = self.input.as_bytes();
-        let start_cursor = self.cursor;
-        let mut current_state: u16 = 17;
-        let mut last_accept_state = None;
-        let mut last_accept_cursor = self.cursor;
+        let current_char = self.input[self.cursor..].chars().next().unwrap();
 
-        while self.cursor < bytes.len() {
-            let byte = bytes[self.cursor];
-            let class_id = CLASS_MAP[byte as usize];
-            let next_state = TRANSITIONS[current_state as usize][class_id as usize];
+        // 1. Trivia Handling (Automatic skipping)
+        if current_char.is_whitespace() {
+            while self.cursor < self.input.len() {
+                let c = self.input[self.cursor..].chars().next().unwrap();
+                if c.is_whitespace() {
+                    self.cursor += c.len_utf8();
+                } else {
+                    break;
+                }
+            }
+            return self.next();
+        }
 
-            if next_state == 0 { break; }
+        if current_char == '#' {
+            while self.cursor < self.input.len() {
+                let c = self.input[self.cursor..].chars().next().unwrap();
+                self.cursor += c.len_utf8();
+                if c == '\n' {
+                    break;
+                }
+            }
+            return self.next();
+        }
 
-            current_state = next_state;
+        // 2. Single-Character Punctuation
+        if current_char == '=' {
             self.cursor += 1;
+            return Some(Ok(Token::Assign));
+        }
+        if current_char == ';' {
+            self.cursor += 1;
+            return Some(Ok(Token::Semi));
+        }
 
-            if let Some(rule_id) = ACCEPT[current_state as usize] {
-                last_accept_state = Some(rule_id);
-                last_accept_cursor = self.cursor;
+        // 3. Context-Sensitive Payloads MUST be evaluated before Identifiers
+        let tail = &self.input[self.cursor..];
+        if tail.starts_with("r#") || tail.starts_with("c#") {
+            let is_code_block = tail.starts_with("c#");
+            let mut temp_cursor = self.cursor + 1; // Skip 'r' or 'c'
+            let mut hash_count = 0;
+
+            while temp_cursor < self.input.len() && bytes[temp_cursor] == b'#' {
+                hash_count += 1;
+                temp_cursor += 1;
+            }
+
+            if temp_cursor < self.input.len()
+                && (bytes[temp_cursor] == b'"' || bytes[temp_cursor] == b'`')
+            {
+                let quote_char = bytes[temp_cursor];
+                temp_cursor += 1;
+
+                let mut search_offset = temp_cursor;
+                loop {
+                    let window = &self.input[search_offset..];
+                    if let Some(idx) = window.find(quote_char as char) {
+                        let abs_idx = search_offset + idx;
+                        let hash_start = abs_idx + 1;
+                        let hash_end = hash_start + hash_count;
+
+                        if hash_end <= self.input.len()
+                            && self.input[hash_start..hash_end].bytes().all(|b| b == b'#')
+                        {
+                            self.cursor = hash_end;
+                            let slice = &self.input[self.token_start..self.cursor];
+                            return Some(Ok(if is_code_block {
+                                Token::CodeBlock(slice)
+                            } else {
+                                Token::RawRegex(slice)
+                            }));
+                        }
+                        search_offset = abs_idx + 1;
+                    } else {
+                        self.cursor = self.input.len();
+                        return Some(Err(LexerError {
+                            byte_offset: self.token_start,
+                        }));
+                    }
+                }
             }
         }
 
-        if let Some(rule_id) = last_accept_state {
-            self.cursor = last_accept_cursor;
-            let slice = &self.input[start_cursor..self.cursor];
+        // 4. Identifiers and Keywords
+        if current_char.is_ascii_alphabetic() || current_char == '_' {
+            while self.cursor < self.input.len() {
+                let c = self.input[self.cursor..].chars().next().unwrap();
+                if c.is_ascii_alphanumeric() || c == '_' {
+                    self.cursor += c.len_utf8();
+                } else {
+                    break;
+                }
+            }
 
-            let token = match rule_id {
-                0 => Token::Whitespace,
-                1 => Token::Comment,
-                2 => Token::LetKw,
-                3 => Token::RuleKw,
-                4 => Token::SkipKw,
-                5 => Token::Assign,
-                6 => Token::Semi,
-                7 => Token::Identifier(slice),
-                8 => Token::RawRegex(slice),
-                9 => Token::CodeBlock(slice),
-                _ => unreachable!(),
+            let slice = &self.input[self.token_start..self.cursor];
+            let token = match slice {
+                "let" => Token::LetKw,
+                "rule" => Token::RuleKw,
+                "skip" => Token::SkipKw,
+                _ => Token::Identifier(slice),
             };
-
-            Some(Ok(Spanned { node: token, span: Span { start: start_cursor, end: self.cursor } }))
-        } else {
-            let c = self.input[start_cursor..].chars().next().unwrap();
-            self.cursor = start_cursor + c.len_utf8();
-            Some(Err(LexerError { byte_offset: start_cursor }))
+            return Some(Ok(token));
         }
+
+        // 5. Unrecognized Character Path
+        self.cursor += current_char.len_utf8();
+        Some(Err(LexerError {
+            byte_offset: self.token_start,
+        }))
     }
 }
