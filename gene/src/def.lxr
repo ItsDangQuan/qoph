@@ -1,16 +1,21 @@
-skip rule Whitespace = r#`[ \t\n\r]+`#;
-skip rule Comment = r#`#[^\n]*`#;
+# 1. Trivia
+skip rule Whitespace = r#"[ \t\n\r]+"#;
+skip rule Comment = r#"#[^\n]*"#;
 
-rule LetKw = r#`let`#;
-rule RuleKw = r#`rule`#;
-rule SkipKw = r#`skip`#;
+# 2. Keywords
+rule LetKw = r#"let"#;
+rule RuleKw = r#"rule"#;
+rule SkipKw = r#"skip"#;
 
-rule Assign = r#`=`#;
-rule Semi = r#`;`#;
+# 3. Punctuation
+rule Assign = r#"="#;
+rule Semi = r#";"#;
 
-rule Identifier = r#`[a-zA-Z_][a-zA-Z0-9_]*`#;
+# 4. Identifiers
+rule Identifier = r#"[a-zA-Z_][a-zA-Z0-9_]*"#;
 
-rule RawRegex = r#`r#*"`# c#`
+# 5. Context-Sensitive Payloads
+rule RawRegex = r#"r#*""# c#"
     let hash_count = slice.len() - 2; 
     let mut search_offset = self.cursor;
     let final_token;
@@ -37,9 +42,9 @@ rule RawRegex = r#`r#*"`# c#`
         }
     }
     final_token
-`#;
+"#;
 
-rule CodeBlock = r#`c#*"`# c#`
+rule CodeBlock = r#"c#*""# c#"
     let hash_count = slice.len() - 2; 
     let mut search_offset = self.cursor;
     let final_token;
@@ -66,4 +71,4 @@ rule CodeBlock = r#`c#*"`# c#`
         }
     }
     final_token
-`#;
+"#;

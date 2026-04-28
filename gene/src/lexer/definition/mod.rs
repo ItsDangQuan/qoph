@@ -2,6 +2,7 @@
 
 mod core;
 mod error;
+#[rustfmt::skip]
 mod lexer;
 mod parser;
 
