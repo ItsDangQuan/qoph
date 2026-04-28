@@ -1,6 +1,4 @@
 pub(super) const LEXER_BASE: &str = r#"
-// AUTO-GENERATED LEXER
-
 use std::ops::Range;
 
 #[derive(Debug, Clone, PartialEq, Eq)]

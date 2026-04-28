@@ -202,12 +202,12 @@ impl NfaBuilder {
 
 #[cfg(test)]
 mod tests {
-    use crate::lexer::definition::RuleId;
     use crate::lexer::regex::RegexParser;
+    use crate::lexer::{definition::RuleId, regex::RegexAst};
 
     use super::{NfaBuilder, Transition};
 
-    fn parse_regex(input: &str) -> crate::lexer::regex::RegexAst {
+    fn parse_regex<'a>(input: &'a str) -> RegexAst<'a> {
         let parser = RegexParser::new(input, 0);
         parser.parse().expect("regex should parse")
     }

@@ -1,4 +1,6 @@
-// AUTO-GENERATED LEXER
+#[rustfmt::skip]
+#[allow(dead_code)]
+mod generated {
 
 use std::ops::Range;
 
@@ -192,62 +194,62 @@ impl<'a> Iterator for Lexer<'a> {
                 5 => Token::Assign(slice),
                 6 => Token::Semi(slice),
                 7 => Token::Identifier(slice),
-                8 => { 
-    let hash_count = slice.len() - 2; 
-    let mut search_offset = self.cursor;
-    let final_token;
-    
-    loop {
-        let window = &self.input[search_offset..];
-        match window.find('"') {
-            Some(quote_rel_idx) => {
-                let quote_abs_idx = search_offset + quote_rel_idx;
-                let hash_start = quote_abs_idx + 1;
-                let hash_end = hash_start + hash_count;
+                8 => {
+                    let hash_count = slice.len() - 2; 
+                    let mut search_offset = self.cursor;
+                    let final_token;
 
-                if hash_end <= self.input.len() && self.input[hash_start..hash_end].bytes().all(|b| b == b'#') {
-                    self.cursor = hash_end;
-                    final_token = Token::RawRegex(&self.input[self.token_start..self.cursor]);
-                    break;
-                }
-                search_offset = quote_abs_idx + 1;
-            }
-            None => {
-                self.cursor = self.input.len();
-                return Some(Err(LexerError { byte_offset: self.token_start }));
-            }
-        }
-    }
-    final_token
- },
-                9 => { 
-    let hash_count = slice.len() - 2; 
-    let mut search_offset = self.cursor;
-    let final_token;
-    
-    loop {
-        let window = &self.input[search_offset..];
-        match window.find('"') {
-            Some(quote_rel_idx) => {
-                let quote_abs_idx = search_offset + quote_rel_idx;
-                let hash_start = quote_abs_idx + 1;
-                let hash_end = hash_start + hash_count;
+                    loop {
+                        let window = &self.input[search_offset..];
+                        match window.find('"') {
+                            Some(quote_rel_idx) => {
+                                let quote_abs_idx = search_offset + quote_rel_idx;
+                                let hash_start = quote_abs_idx + 1;
+                                let hash_end = hash_start + hash_count;
 
-                if hash_end <= self.input.len() && self.input[hash_start..hash_end].bytes().all(|b| b == b'#') {
-                    self.cursor = hash_end;
-                    final_token = Token::CodeBlock(&self.input[self.token_start..self.cursor]);
-                    break;
-                }
-                search_offset = quote_abs_idx + 1;
-            }
-            None => {
-                self.cursor = self.input.len();
-                return Some(Err(LexerError { byte_offset: self.token_start }));
-            }
-        }
-    }
-    final_token
- },
+                                if hash_end <= self.input.len() && self.input[hash_start..hash_end].bytes().all(|b| b == b'#') {
+                                    self.cursor = hash_end;
+                                    final_token = Token::RawRegex(&self.input[self.token_start..self.cursor]);
+                                    break;
+                                }
+                                search_offset = quote_abs_idx + 1;
+                            }
+                            None => {
+                                self.cursor = self.input.len();
+                                return Some(Err(LexerError { byte_offset: self.token_start }));
+                            }
+                        }
+                    }
+                    final_token
+                },
+                9 => {
+                    let hash_count = slice.len() - 2; 
+                    let mut search_offset = self.cursor;
+                    let final_token;
+
+                    loop {
+                        let window = &self.input[search_offset..];
+                        match window.find('"') {
+                            Some(quote_rel_idx) => {
+                                let quote_abs_idx = search_offset + quote_rel_idx;
+                                let hash_start = quote_abs_idx + 1;
+                                let hash_end = hash_start + hash_count;
+
+                                if hash_end <= self.input.len() && self.input[hash_start..hash_end].bytes().all(|b| b == b'#') {
+                                    self.cursor = hash_end;
+                                    final_token = Token::CodeBlock(&self.input[self.token_start..self.cursor]);
+                                    break;
+                                }
+                                search_offset = quote_abs_idx + 1;
+                            }
+                            None => {
+                                self.cursor = self.input.len();
+                                return Some(Err(LexerError { byte_offset: self.token_start }));
+                            }
+                        }
+                    }
+                    final_token
+                },
                 _ => unreachable!(),
             };
 
@@ -259,3 +261,8 @@ impl<'a> Iterator for Lexer<'a> {
         }
     }
 }
+
+}
+
+#[allow(unused_imports)]
+pub use generated::{Lexer, LexerError, SpannedIter, Token};

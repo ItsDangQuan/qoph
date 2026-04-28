@@ -1,18 +1,18 @@
 # 1. Trivia
-skip rule Whitespace = r#"[ \t\n\r]+"#;
-skip rule Comment = r#"#[^\n]*"#;
+skip rule Whitespace = r"[ \t\n\r]+";
+skip rule Comment = r"#[^\n]*";
 
 # 2. Keywords
-rule LetKw = r#"let"#;
-rule RuleKw = r#"rule"#;
-rule SkipKw = r#"skip"#;
+rule LetKw = r"let";
+rule RuleKw = r"rule";
+rule SkipKw = r"skip";
 
 # 3. Punctuation
-rule Assign = r#"="#;
-rule Semi = r#";"#;
+rule Assign = r"=";
+rule Semi = r";";
 
 # 4. Identifiers
-rule Identifier = r#"[a-zA-Z_][a-zA-Z0-9_]*"#;
+rule Identifier = r"[a-zA-Z_][a-zA-Z0-9_]*";
 
 # 5. Context-Sensitive Payloads
 rule RawRegex = r#"r#*""# c#"

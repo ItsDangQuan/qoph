@@ -42,7 +42,11 @@ impl<'a> CodeEmitter<'a> {
             .replace("{START_STATE}", &start_state)
             .replace("{MATCH_ARMS}", &match_arms_str);
 
-        format!("{}\n{}", base_code, iterator_code)
+        let payload = format!("{}\n{}", base_code, iterator_code);
+
+        let preamble = "#[rustfmt::skip]\n#[allow(dead_code)]\nmod generated {";
+        let postamble = "}\n\n#[allow(unused_imports)]\npub use generated::{Lexer, LexerError, SpannedIter, Token};\n";
+        format!("{}\n\n{}\n{}", preamble, payload, postamble)
     }
 
     fn emit_tokens(&self) -> String {
@@ -102,7 +106,10 @@ impl<'a> CodeEmitter<'a> {
                     id
                 ));
             } else if let Some(action) = rule.action {
-                out.push_str(&format!("                {} => {{ {} }},\n", id, action));
+                let formatted = Self::normalize_indentation(action, "                    ");
+                out.push_str(&format!("                {} => {{", id));
+                out.push_str(&formatted);
+                out.push_str("\n                },\n");
             } else {
                 out.push_str(&format!(
                     "                {} => Token::{}(slice),\n",
@@ -111,5 +118,33 @@ impl<'a> CodeEmitter<'a> {
             }
         }
         out.trim_end().to_string()
+    }
+
+    fn normalize_indentation(raw_code: &str, target_indent: &str) -> String {
+        let lines: Vec<_> = raw_code.lines().collect();
+
+        let min_indent = lines
+            .iter()
+            .filter(|line| !line.trim().is_empty())
+            .map(|line| line.chars().take_while(|c| c.is_whitespace()).count())
+            .min()
+            .unwrap_or(0);
+
+        lines
+            .into_iter()
+            .map(|line| {
+                if line.trim().is_empty() {
+                    String::new()
+                } else {
+                    let stripped = if line.len() >= min_indent {
+                        &line[min_indent..]
+                    } else {
+                        line.trim_start()
+                    };
+                    format!("{}{}", target_indent, stripped)
+                }
+            })
+            .collect::<Vec<_>>()
+            .join("\n")
     }
 }
