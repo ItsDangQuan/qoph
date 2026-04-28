@@ -7,14 +7,14 @@ pub(crate) enum PayloadType {
 }
 
 #[derive(Debug)]
-pub(crate) struct LexerRule {
-    pub(crate) ast: RegexAst,
+pub(crate) struct LexerRule<'a> {
+    pub(crate) ast: RegexAst<'a>,
     pub(crate) variant_name: String,
     pub(crate) payload: PayloadType,
     pub(crate) priority: usize,
 }
 
 #[derive(Debug)]
-pub(crate) struct LexerDefinition {
-    pub(crate) rules: Vec<LexerRule>,
+pub(crate) struct LexerDefinition<'a> {
+    pub(crate) rules: Vec<LexerRule<'a>>,
 }

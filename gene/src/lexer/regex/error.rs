@@ -6,11 +6,14 @@ pub(crate) enum RegexParserErrorKind {
     UnexpectedTrailingChars,
     UnclosedGrouping,
     UnclosedCharClass,
+    UnclosedFragmentRef,
     InvalidCharRange { start: char, end: char },
     UnescapedMetaChar(char),
     UnescapedClassMetaChar(char),
     TrailingBackslash,
     UnexpectedEof,
+    EmptyFragmentRef,
+    InvalidIdentStart(char),
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -22,7 +25,11 @@ pub(crate) struct RegexParserError {
 
 impl fmt::Display for RegexParserError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "Parse error at {}-{}: ", self.span.start, self.span.end)?;
+        write!(
+            f,
+            "Regex parse error at {}-{}: ",
+            self.span.start, self.span.end
+        )?;
 
         match &self.kind {
             RegexParserErrorKind::UnexpectedTrailingChars => {
@@ -48,6 +55,19 @@ impl fmt::Display for RegexParserError {
             }
             RegexParserErrorKind::UnexpectedEof => {
                 write!(f, "Unexpected end of input")
+            }
+            RegexParserErrorKind::UnclosedFragmentRef => {
+                write!(f, "Unclosed fragment reference, expected '}}'")
+            }
+            RegexParserErrorKind::EmptyFragmentRef => {
+                write!(f, "Empty fragment reference, expected identifier")
+            }
+            RegexParserErrorKind::InvalidIdentStart(c) => {
+                write!(
+                    f,
+                    "Invalid identifier start '{}', expected ASCII alphabetic or underscore '_'",
+                    c
+                )
             }
         }
     }

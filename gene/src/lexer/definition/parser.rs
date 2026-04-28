@@ -12,7 +12,7 @@ impl<'a> DefinitionParser<'a> {
         Self { input }
     }
 
-    pub(crate) fn parse(&self) -> DefinitionParserResult<LexerDefinition> {
+    pub(crate) fn parse(self) -> DefinitionParserResult<LexerDefinition<'a>> {
         let mut rules = Vec::new();
         let mut priority = 0;
         let mut line_start = 0;

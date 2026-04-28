@@ -23,7 +23,7 @@ impl<'a> RegexParser<'a> {
     }
 
     /// Parses a full regular-expression expression, consuming the parser.
-    pub(crate) fn parse(mut self) -> Result<RegexAst, RegexParserError> {
+    pub(crate) fn parse(mut self) -> Result<RegexAst<'a>, RegexParserError> {
         let ast = self.parse_alternation()?;
 
         if let Some(c) = self.peek() {
@@ -54,7 +54,7 @@ impl<'a> RegexParser<'a> {
         Some(c)
     }
 
-    fn parse_alternation(&mut self) -> Result<RegexAst, RegexParserError> {
+    fn parse_alternation(&mut self) -> Result<RegexAst<'a>, RegexParserError> {
         let mut left = self.parse_concatenation()?;
 
         while let Some('|') = self.peek() {
@@ -66,7 +66,7 @@ impl<'a> RegexParser<'a> {
         Ok(left)
     }
 
-    fn parse_concatenation(&mut self) -> Result<RegexAst, RegexParserError> {
+    fn parse_concatenation(&mut self) -> Result<RegexAst<'a>, RegexParserError> {
         let mut left = self.parse_closure()?;
 
         while let Some(c) = self.peek()
@@ -79,7 +79,7 @@ impl<'a> RegexParser<'a> {
         Ok(left)
     }
 
-    fn parse_closure(&mut self) -> Result<RegexAst, RegexParserError> {
+    fn parse_closure(&mut self) -> Result<RegexAst<'a>, RegexParserError> {
         let ast = self.parse_base()?;
 
         match self.peek() {
@@ -99,7 +99,7 @@ impl<'a> RegexParser<'a> {
         }
     }
 
-    fn parse_base(&mut self) -> Result<RegexAst, RegexParserError> {
+    fn parse_base(&mut self) -> Result<RegexAst<'a>, RegexParserError> {
         match self.peek() {
             Some('(') => {
                 let loc = self.current_location();
@@ -125,6 +125,47 @@ impl<'a> RegexParser<'a> {
                     }),
                 }
             }
+            Some('{') => {
+                let loc = self.current_location();
+                self.next();
+
+                let ident_start = self.cursor;
+                let ident_loc = self.current_location();
+
+                while let Some(c) = self.peek()
+                    && (c.is_ascii_alphanumeric() || c == '_')
+                {
+                    self.next();
+                }
+
+                let ident_str = &self.input[ident_start..self.cursor];
+
+                if self.next() != Some('}') {
+                    return Err(RegexParserError {
+                        kind: RegexParserErrorKind::UnclosedFragmentRef,
+                        span: loc..self.current_location(),
+                    });
+                }
+
+                if ident_str.is_empty() {
+                    return Err(RegexParserError {
+                        kind: RegexParserErrorKind::EmptyFragmentRef,
+                        span: loc..self.current_location(),
+                    });
+                }
+
+                // SAFETY: ident_str is non-empty by prior check
+                if let Some(c) = ident_str.chars().next()
+                    && c.is_ascii_digit()
+                {
+                    return Err(RegexParserError {
+                        kind: RegexParserErrorKind::InvalidIdentStart(c),
+                        span: ident_loc..ident_loc + c.len_utf8(),
+                    });
+                }
+
+                Ok(RegexAst::FragmentRef(ident_str))
+            }
             Some('\\') => {
                 let loc = self.current_location();
                 self.next();
@@ -140,7 +181,7 @@ impl<'a> RegexParser<'a> {
                 self.next();
                 Ok(RegexAst::Wildcard)
             }
-            Some(c) if matches!(c, '|' | '*' | '+' | '?' | '(' | ')' | '[' | ']') => {
+            Some(c) if matches!(c, '|' | '*' | '+' | '?' | ')' | ']' | '}') => {
                 let loc = self.current_location();
                 self.next();
                 Err(RegexParserError {
@@ -171,7 +212,7 @@ impl<'a> RegexParser<'a> {
         }
     }
 
-    fn parse_character_class(&mut self) -> Result<RegexAst, RegexParserError> {
+    fn parse_character_class(&mut self) -> Result<RegexAst<'a>, RegexParserError> {
         let negated = match self.peek() {
             Some('^') => {
                 self.next();

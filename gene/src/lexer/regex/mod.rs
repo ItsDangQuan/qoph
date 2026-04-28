@@ -9,9 +9,10 @@
 //! Closure        <- Base ( '*' / '+' / '?' )?
 //! Base           <- '(' Alternation ')'
 //!                 / '[' CharacterClass ']'
+//!                 / '{' [a-zA-Z_] [a-zA-Z0-9_]* '}'
 //!                 / '\\' EscapeCode
 //!                 / '.'
-//!                 / !( '|' / '*' / '+' / '?' / '(' / ')' / '[' / ']' ) .
+//!                 / !( '|' / '*' / '+' / '?' / ')' / ']' / '}' ) .
 //! CharacterClass <- '^'? ( !']' ClassItem )*
 //! ClassItem      <- ClassBound ( '-' ClassBound )?
 //! ClassBound     <- '\\' EscapeCode

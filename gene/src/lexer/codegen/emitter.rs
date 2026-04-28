@@ -5,13 +5,13 @@ use crate::lexer::dfa::Dfa;
 
 use super::compressor::EquivalenceClasses;
 
-pub(crate) struct RustEmitter {
-    definition: LexerDefinition,
+pub(crate) struct RustEmitter<'a> {
+    definition: LexerDefinition<'a>,
     dfa: Dfa,
 }
 
-impl RustEmitter {
-    pub(crate) fn new(definition: LexerDefinition, dfa: Dfa) -> Self {
+impl<'a> RustEmitter<'a> {
+    pub(crate) fn new(definition: LexerDefinition<'a>, dfa: Dfa) -> Self {
         Self { definition, dfa }
     }
 

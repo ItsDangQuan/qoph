@@ -166,6 +166,9 @@ impl NfaBuilder {
 
                 (new_start, new_accept)
             }
+            RegexAst::FragmentRef(_) => {
+                unreachable!("encounter fragment reference despite semantic analyzed")
+            }
         }
     }
 
