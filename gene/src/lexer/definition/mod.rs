@@ -2,6 +2,7 @@
 
 mod core;
 mod error;
+mod lexer;
 mod parser;
 
 pub(crate) use core::{LexerDefinition, PayloadType};
