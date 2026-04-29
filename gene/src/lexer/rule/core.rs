@@ -4,16 +4,16 @@ use std::ops::Range;
 use crate::lexer::regex::RegexAst;
 
 #[derive(Debug, Clone)]
-pub(crate) struct LexerDef<'a> {
+pub(crate) struct Rule<'a> {
     /// Reusable regex macro fragments.
-    pub(crate) fragments: HashMap<&'a str, FragmentDecl<'a>>,
+    pub(crate) fragments: HashMap<&'a str, FragmentRule<'a>>,
 
     /// The ordered sequence of token rules.
     pub(crate) rules: Vec<TokenRule<'a>>,
 }
 
 #[derive(Debug, Clone)]
-pub(crate) struct FragmentDecl<'a> {
+pub(crate) struct FragmentRule<'a> {
     pub(crate) name: &'a str,
     pub(crate) ast: RegexAst<'a>,
     pub(crate) span: Range<usize>,

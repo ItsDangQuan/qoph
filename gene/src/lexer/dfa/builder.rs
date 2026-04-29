@@ -1,7 +1,7 @@
 use std::collections::BTreeMap;
 
-use crate::lexer::definition::RuleId;
 use crate::lexer::nfa::{Nfa, Transition};
+use crate::lexer::rule::RuleId;
 
 use super::bitset::BitSet;
 use super::core::{Dfa, DfaState};

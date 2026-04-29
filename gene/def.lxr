@@ -37,7 +37,7 @@ rule RawRegex = r#"r#*""# c#"
             }
             None => {
                 self.cursor = self.input.len();
-                return Some(Err(LexerError { byte_offset: self.token_start }));
+                return Some(Err(()));
             }
         }
     }
@@ -66,7 +66,7 @@ rule CodeBlock = r#"c#*""# c#"
             }
             None => {
                 self.cursor = self.input.len();
-                return Some(Err(LexerError { byte_offset: self.token_start }));
+                return Some(Err(()));
             }
         }
     }

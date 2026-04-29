@@ -22,9 +22,7 @@
 
 mod char_set;
 mod core;
-mod error;
 mod parser;
 
 pub(crate) use core::RegexAst;
-pub(crate) use error::RegexParserError;
 pub(crate) use parser::RegexParser;

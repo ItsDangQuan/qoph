@@ -2,21 +2,21 @@ use std::collections::HashMap;
 use std::ops::Range;
 
 use crate::lexer::{
-    definition::{
-        core::{FragmentDecl, LexerDef, TokenRule},
+    regex::RegexParser,
+    rule::{
+        core::{FragmentRule, Rule, TokenRule},
         lexer::{Lexer, Token},
     },
-    regex::RegexParser,
 };
 
-pub(crate) struct DefinitionParser<'a> {
+pub(crate) struct RuleParser<'a> {
     lexer: Lexer<'a>,
     peeked: Option<(Token<'a>, Range<usize>)>,
-    fragments: HashMap<&'a str, FragmentDecl<'a>>,
+    fragments: HashMap<&'a str, FragmentRule<'a>>,
     rules: Vec<TokenRule<'a>>,
 }
 
-impl<'a> DefinitionParser<'a> {
+impl<'a> RuleParser<'a> {
     pub(crate) fn new(input: &'a str) -> Self {
         let mut parser = Self {
             lexer: Lexer::new(input),
@@ -37,7 +37,10 @@ impl<'a> DefinitionParser<'a> {
             Some(Ok(token)) => {
                 self.peeked = Some((token, self.lexer.span()));
             }
-            Some(Err(err)) => panic!("Fatal Lexer Error at byte offset {}", err.byte_offset),
+            Some(Err(_)) => {
+                let Range { start, end } = self.lexer.span();
+                panic!("Fatal Lexer Error at byte range {}..{}", start, end)
+            }
             None => {
                 self.peeked = None;
             }
@@ -80,7 +83,7 @@ impl<'a> DefinitionParser<'a> {
 
         self.fragments.insert(
             ident_str,
-            FragmentDecl {
+            FragmentRule {
                 name: ident_str,
                 ast,
                 span: 0..0, // Set up spans later if diagnostic tracking is required
@@ -105,14 +108,12 @@ impl<'a> DefinitionParser<'a> {
         };
 
         // Optional Code Block Lookahead
-        let action = if let Some((peeked_token, _)) = &self.peeked {
-            if let Token::CodeBlock(slice) = peeked_token {
-                let code_slice = *slice;
-                self.advance(); // Consume the code block token
-                Some(Self::strip_raw_boundaries(code_slice))
-            } else {
-                None
-            }
+        let action = if let Some((peeked_token, _)) = &self.peeked
+            && let Token::CodeBlock(slice) = peeked_token
+        {
+            let code_slice = *slice;
+            self.advance(); // Consume the code block token
+            Some(Self::strip_raw_boundaries(code_slice))
         } else {
             None
         };
@@ -133,7 +134,7 @@ impl<'a> DefinitionParser<'a> {
         });
     }
 
-    pub(crate) fn parse(mut self) -> LexerDef<'a> {
+    pub(crate) fn parse(mut self) -> Rule<'a> {
         while let Some((peeked_token, _)) = &self.peeked {
             match peeked_token {
                 Token::LetKw(_) => {
@@ -159,7 +160,7 @@ impl<'a> DefinitionParser<'a> {
             }
         }
 
-        LexerDef {
+        Rule {
             fragments: self.fragments,
             rules: self.rules,
         }

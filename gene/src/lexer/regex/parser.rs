@@ -1,8 +1,9 @@
-use std::ops::RangeInclusive;
+use std::ops::{Range, RangeInclusive};
+
+use crate::lexer::LexerCompilerError;
 
 use super::char_set::CharSet;
 use super::core::RegexAst;
-use super::error::{RegexParserError, RegexParserErrorKind};
 
 #[derive(Debug)]
 /// Recursive-descent parser for the regex grammar used in lexer definitions.
@@ -23,15 +24,15 @@ impl<'a> RegexParser<'a> {
     }
 
     /// Parses a full regular-expression expression, consuming the parser.
-    pub(crate) fn parse(mut self) -> Result<RegexAst<'a>, RegexParserError> {
+    pub(crate) fn parse(mut self) -> Result<RegexAst<'a>, (LexerCompilerError, Range<usize>)> {
         let ast = self.parse_alternation()?;
 
-        if let Some(c) = self.peek() {
-            let loc = self.current_location();
-            return Err(RegexParserError {
-                kind: RegexParserErrorKind::UnexpectedTrailingChars,
-                span: loc..loc + c.len_utf8(),
-            });
+        let loc = self.current_location();
+        if let Some(c) = self.next() {
+            return Err((
+                LexerCompilerError::RegexUnexpectedTrailingChars,
+                loc..self.current_location(),
+            ));
         }
 
         Ok(ast)
@@ -54,7 +55,7 @@ impl<'a> RegexParser<'a> {
         Some(c)
     }
 
-    fn parse_alternation(&mut self) -> Result<RegexAst<'a>, RegexParserError> {
+    fn parse_alternation(&mut self) -> Result<RegexAst<'a>, (LexerCompilerError, Range<usize>)> {
         let mut left = self.parse_concatenation()?;
 
         while let Some('|') = self.peek() {
@@ -66,7 +67,7 @@ impl<'a> RegexParser<'a> {
         Ok(left)
     }
 
-    fn parse_concatenation(&mut self) -> Result<RegexAst<'a>, RegexParserError> {
+    fn parse_concatenation(&mut self) -> Result<RegexAst<'a>, (LexerCompilerError, Range<usize>)> {
         let mut left = self.parse_closure()?;
 
         while let Some(c) = self.peek()
@@ -79,7 +80,7 @@ impl<'a> RegexParser<'a> {
         Ok(left)
     }
 
-    fn parse_closure(&mut self) -> Result<RegexAst<'a>, RegexParserError> {
+    fn parse_closure(&mut self) -> Result<RegexAst<'a>, (LexerCompilerError, Range<usize>)> {
         let ast = self.parse_base()?;
 
         match self.peek() {
@@ -99,7 +100,7 @@ impl<'a> RegexParser<'a> {
         }
     }
 
-    fn parse_base(&mut self) -> Result<RegexAst<'a>, RegexParserError> {
+    fn parse_base(&mut self) -> Result<RegexAst<'a>, (LexerCompilerError, Range<usize>)> {
         match self.peek() {
             Some('(') => {
                 let loc = self.current_location();
@@ -107,10 +108,10 @@ impl<'a> RegexParser<'a> {
                 let ast = self.parse_alternation()?;
                 match self.next() {
                     Some(')') => Ok(ast),
-                    _ => Err(RegexParserError {
-                        kind: RegexParserErrorKind::UnclosedGrouping,
-                        span: loc..self.current_location(),
-                    }),
+                    _ => Err((
+                        LexerCompilerError::RegexUnclosedGrouping,
+                        loc..self.current_location(),
+                    )),
                 }
             }
             Some('[') => {
@@ -119,10 +120,10 @@ impl<'a> RegexParser<'a> {
                 let ast = self.parse_character_class()?;
                 match self.next() {
                     Some(']') => Ok(ast),
-                    _ => Err(RegexParserError {
-                        kind: RegexParserErrorKind::UnclosedCharClass,
-                        span: loc..self.current_location(),
-                    }),
+                    _ => Err((
+                        LexerCompilerError::RegexUnclosedCharClass,
+                        loc..self.current_location(),
+                    )),
                 }
             }
             Some('{') => {
@@ -141,27 +142,27 @@ impl<'a> RegexParser<'a> {
                 let ident_str = &self.input[ident_start..self.cursor];
 
                 if self.next() != Some('}') {
-                    return Err(RegexParserError {
-                        kind: RegexParserErrorKind::UnclosedFragmentRef,
-                        span: loc..self.current_location(),
-                    });
+                    return Err((
+                        LexerCompilerError::RegexUnclosedFragmentRef,
+                        loc..self.current_location(),
+                    ));
                 }
 
                 if ident_str.is_empty() {
-                    return Err(RegexParserError {
-                        kind: RegexParserErrorKind::EmptyFragmentRef,
-                        span: loc..self.current_location(),
-                    });
+                    return Err((
+                        LexerCompilerError::RegexEmptyFragmentRef,
+                        loc..self.current_location(),
+                    ));
                 }
 
                 // SAFETY: ident_str is non-empty by prior check
                 if let Some(c) = ident_str.chars().next()
                     && c.is_ascii_digit()
                 {
-                    return Err(RegexParserError {
-                        kind: RegexParserErrorKind::InvalidIdentStart(c),
-                        span: ident_loc..ident_loc + c.len_utf8(),
-                    });
+                    return Err((
+                        LexerCompilerError::RegexInvalidIdentStart(c),
+                        ident_loc..ident_loc + c.len_utf8(),
+                    ));
                 }
 
                 Ok(RegexAst::FragmentRef(ident_str))
@@ -171,10 +172,10 @@ impl<'a> RegexParser<'a> {
                 self.next();
                 match self.parse_escape_code() {
                     Some(c) => Ok(RegexAst::Literal(c)),
-                    None => Err(RegexParserError {
-                        kind: RegexParserErrorKind::TrailingBackslash,
-                        span: loc..self.current_location(),
-                    }),
+                    None => Err((
+                        LexerCompilerError::RegexTrailingBackslash,
+                        loc..self.current_location(),
+                    )),
                 }
             }
             Some('.') => {
@@ -184,10 +185,10 @@ impl<'a> RegexParser<'a> {
             Some(c) if matches!(c, '|' | '*' | '+' | '?' | ')' | ']' | '}') => {
                 let loc = self.current_location();
                 self.next();
-                Err(RegexParserError {
-                    kind: RegexParserErrorKind::UnescapedMetaChar(c),
-                    span: loc..self.current_location(),
-                })
+                Err((
+                    LexerCompilerError::RegexUnescapedMetaChar(c),
+                    loc..self.current_location(),
+                ))
             }
             Some(c) => {
                 self.next();
@@ -195,10 +196,10 @@ impl<'a> RegexParser<'a> {
             }
             None => {
                 let loc = self.current_location();
-                Err(RegexParserError {
-                    kind: RegexParserErrorKind::UnexpectedEof,
-                    span: loc..self.current_location(),
-                })
+                Err((
+                    LexerCompilerError::RegexUnexpectedEof,
+                    loc..self.current_location(),
+                ))
             }
         }
     }
@@ -212,7 +213,9 @@ impl<'a> RegexParser<'a> {
         }
     }
 
-    fn parse_character_class(&mut self) -> Result<RegexAst<'a>, RegexParserError> {
+    fn parse_character_class(
+        &mut self,
+    ) -> Result<RegexAst<'a>, (LexerCompilerError, Range<usize>)> {
         let negated = match self.peek() {
             Some('^') => {
                 self.next();
@@ -236,7 +239,9 @@ impl<'a> RegexParser<'a> {
         }
     }
 
-    fn parse_class_item(&mut self) -> Result<RangeInclusive<char>, RegexParserError> {
+    fn parse_class_item(
+        &mut self,
+    ) -> Result<RangeInclusive<char>, (LexerCompilerError, Range<usize>)> {
         let loc = self.current_location();
         let left = self.parse_class_bound()?;
 
@@ -246,13 +251,13 @@ impl<'a> RegexParser<'a> {
                 let right = self.parse_class_bound()?;
 
                 if left > right {
-                    return Err(RegexParserError {
-                        kind: RegexParserErrorKind::InvalidCharRange {
+                    return Err((
+                        LexerCompilerError::RegexInvalidCharRange {
                             start: left,
                             end: right,
                         },
-                        span: loc..self.current_location(),
-                    });
+                        loc..self.current_location(),
+                    ));
                 }
 
                 Ok(left..=right)
@@ -261,22 +266,22 @@ impl<'a> RegexParser<'a> {
         }
     }
 
-    fn parse_class_bound(&mut self) -> Result<char, RegexParserError> {
+    fn parse_class_bound(&mut self) -> Result<char, (LexerCompilerError, Range<usize>)> {
         let loc = self.current_location();
         match self.next() {
-            Some('\\') => self.parse_escape_code().ok_or(RegexParserError {
-                kind: RegexParserErrorKind::TrailingBackslash,
-                span: loc..self.current_location(),
-            }),
-            Some(c) if matches!(c, ']' | '-') => Err(RegexParserError {
-                kind: RegexParserErrorKind::UnescapedClassMetaChar(c),
-                span: loc..self.current_location(),
-            }),
+            Some('\\') => self.parse_escape_code().ok_or((
+                LexerCompilerError::RegexTrailingBackslash,
+                loc..self.current_location(),
+            )),
+            Some(c) if matches!(c, ']' | '-') => Err((
+                LexerCompilerError::RegexUnescapedClassMetaChar(c),
+                loc..self.current_location(),
+            )),
             Some(c) => Ok(c),
-            None => Err(RegexParserError {
-                kind: RegexParserErrorKind::UnexpectedEof,
-                span: loc..self.current_location(),
-            }),
+            None => Err((
+                LexerCompilerError::RegexUnexpectedEof,
+                loc..self.current_location(),
+            )),
         }
     }
 }
@@ -291,7 +296,7 @@ mod tests {
             .expect("regex should parse")
     }
 
-    fn parse_err(input: &str) -> RegexParserError {
+    fn parse_err(input: &str) -> (LexerCompilerError, Range<usize>) {
         RegexParser::new(input, 0)
             .parse()
             .expect_err("regex should fail")
@@ -416,8 +421,8 @@ mod tests {
     #[test]
     fn unescaped_right_bracket_fails_globally() {
         let err = parse_err("]");
-        assert_eq!(err.kind, RegexParserErrorKind::UnescapedMetaChar(']'));
-        assert_eq!(err.span, 0..1);
+        assert_eq!(err.0, LexerCompilerError::RegexUnescapedMetaChar(']'));
+        assert_eq!(err.1, 0..1);
     }
 
     #[test]
@@ -447,30 +452,30 @@ mod tests {
     #[test]
     fn unescaped_hyphen_fails_at_class_start() {
         let err = parse_err("[-a]");
-        assert_eq!(err.kind, RegexParserErrorKind::UnescapedClassMetaChar('-'));
-        assert_eq!(err.span, 1..2);
+        assert_eq!(err.0, LexerCompilerError::RegexUnescapedClassMetaChar('-'));
+        assert_eq!(err.1, 1..2);
     }
 
     #[test]
     fn unescaped_hyphen_fails_at_class_end() {
         let err = parse_err("[a-]");
-        assert_eq!(err.kind, RegexParserErrorKind::UnescapedClassMetaChar(']'));
-        assert_eq!(err.span, 3..4);
+        assert_eq!(err.0, LexerCompilerError::RegexUnescapedClassMetaChar(']'));
+        assert_eq!(err.1, 3..4);
     }
 
     #[test]
     fn unescaped_right_bracket_cannot_be_class_data() {
         let err = parse_err("[a-]]");
-        assert_eq!(err.kind, RegexParserErrorKind::UnescapedClassMetaChar(']'));
-        assert_eq!(err.span, 3..4);
+        assert_eq!(err.0, LexerCompilerError::RegexUnescapedClassMetaChar(']'));
+        assert_eq!(err.1, 3..4);
     }
 
     #[test]
     fn invalid_reversed_range_reports_error() {
         let err = parse_err("[z-a]");
         assert_eq!(
-            err.kind,
-            RegexParserErrorKind::InvalidCharRange {
+            err.0,
+            LexerCompilerError::RegexInvalidCharRange {
                 start: 'z',
                 end: 'a',
             }
@@ -480,41 +485,41 @@ mod tests {
     #[test]
     fn trailing_backslash_reports_error() {
         let err = parse_err("\\");
-        assert_eq!(err.kind, RegexParserErrorKind::TrailingBackslash);
-        assert_eq!(err.span, 0..1);
+        assert_eq!(err.0, LexerCompilerError::RegexTrailingBackslash);
+        assert_eq!(err.1, 0..1);
     }
 
     #[test]
     fn trailing_backslash_in_class_reports_error() {
         let err = parse_err("[a\\");
-        assert_eq!(err.kind, RegexParserErrorKind::TrailingBackslash);
-        assert_eq!(err.span, 2..3);
+        assert_eq!(err.0, LexerCompilerError::RegexTrailingBackslash);
+        assert_eq!(err.1, 2..3);
     }
 
     #[test]
     fn unclosed_group_reports_error() {
         let err = parse_err("(ab");
-        assert_eq!(err.kind, RegexParserErrorKind::UnclosedGrouping);
+        assert_eq!(err.0, LexerCompilerError::RegexUnclosedGrouping);
     }
 
     #[test]
     fn unclosed_class_reports_error() {
         let err = parse_err("[ab");
-        assert_eq!(err.kind, RegexParserErrorKind::UnclosedCharClass);
+        assert_eq!(err.0, LexerCompilerError::RegexUnclosedCharClass);
     }
 
     #[test]
     fn unescaped_operator_reports_error() {
         let err = parse_err("*");
-        assert_eq!(err.kind, RegexParserErrorKind::UnescapedMetaChar('*'));
-        assert_eq!(err.span, 0..1);
+        assert_eq!(err.0, LexerCompilerError::RegexUnescapedMetaChar('*'));
+        assert_eq!(err.1, 0..1);
     }
 
     #[test]
     fn unexpected_trailing_chars_reports_error() {
         let err = parse_err("a)");
-        assert_eq!(err.kind, RegexParserErrorKind::UnexpectedTrailingChars);
-        assert_eq!(err.span, 1..2);
+        assert_eq!(err.0, LexerCompilerError::RegexUnexpectedTrailingChars);
+        assert_eq!(err.1, 1..2);
     }
 
     #[test]
@@ -522,7 +527,7 @@ mod tests {
         let err = RegexParser::new("]", 10)
             .parse()
             .expect_err("regex should fail");
-        assert_eq!(err.kind, RegexParserErrorKind::UnescapedMetaChar(']'));
-        assert_eq!(err.span, 10..11);
+        assert_eq!(err.0, LexerCompilerError::RegexUnescapedMetaChar(']'));
+        assert_eq!(err.1, 10..11);
     }
 }

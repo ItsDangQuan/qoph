@@ -1,5 +1,5 @@
-use crate::lexer::definition::RuleId;
 use crate::lexer::regex::RegexAst;
+use crate::lexer::rule::RuleId;
 
 use super::byte;
 use super::core::{Nfa, NfaState, Transition};
@@ -203,7 +203,7 @@ impl NfaBuilder {
 #[cfg(test)]
 mod tests {
     use crate::lexer::regex::RegexParser;
-    use crate::lexer::{definition::RuleId, regex::RegexAst};
+    use crate::lexer::{regex::RegexAst, rule::RuleId};
 
     use super::{NfaBuilder, Transition};
 

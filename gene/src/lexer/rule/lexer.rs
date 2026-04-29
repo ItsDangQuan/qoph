@@ -101,11 +101,6 @@ const ACCEPT: [Option<usize>; 30] = [
     Some(7),
 ];
 
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct LexerError {
-    pub byte_offset: usize,
-}
-
 pub struct Lexer<'a> {
     input: &'a str,
     cursor: usize,
@@ -139,7 +134,7 @@ pub struct SpannedIter<'a> {
 }
 
 impl<'a> Iterator for SpannedIter<'a> {
-    type Item = (Result<Token<'a>, LexerError>, Range<usize>);
+    type Item = (Result<Token<'a>, ()>, Range<usize>);
 
     fn next(&mut self) -> Option<Self::Item> {
         let token_res = self.lexer.next()?;
@@ -149,7 +144,7 @@ impl<'a> Iterator for SpannedIter<'a> {
 }
 
 impl<'a> Iterator for Lexer<'a> {
-    type Item = Result<Token<'a>, LexerError>;
+    type Item = Result<Token<'a>, ()>;
 
     fn next(&mut self) -> Option<Self::Item> {
         if self.cursor >= self.input.len() {
@@ -216,7 +211,7 @@ impl<'a> Iterator for Lexer<'a> {
                             }
                             None => {
                                 self.cursor = self.input.len();
-                                return Some(Err(LexerError { byte_offset: self.token_start }));
+                                return Some(Err(()));
                             }
                         }
                     }
@@ -244,7 +239,7 @@ impl<'a> Iterator for Lexer<'a> {
                             }
                             None => {
                                 self.cursor = self.input.len();
-                                return Some(Err(LexerError { byte_offset: self.token_start }));
+                                return Some(Err(()));
                             }
                         }
                     }
@@ -257,7 +252,7 @@ impl<'a> Iterator for Lexer<'a> {
         } else {
             let next_char = self.input[self.token_start..].chars().next().unwrap();
             self.cursor = self.token_start + next_char.len_utf8();
-            Some(Err(LexerError { byte_offset: self.token_start }))
+            Some(Err(()))
         }
     }
 }
@@ -265,4 +260,4 @@ impl<'a> Iterator for Lexer<'a> {
 }
 
 #[allow(unused_imports)]
-pub use generated::{Lexer, LexerError, SpannedIter, Token};
+pub use generated::{Lexer, SpannedIter, Token};

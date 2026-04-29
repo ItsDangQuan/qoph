@@ -7,25 +7,26 @@
 //! 4. Minimize the DFA.
 //! 5. Emit standalone Rust source for a table-driven lexer.
 
+mod codegen;
+mod dfa;
+mod error;
+mod nfa;
+mod regex;
+mod rule;
+
+pub(crate) use error::LexerCompilerError;
+
 use std::error::Error;
 
 use codegen::CodeEmitter;
-use definition::DefinitionParser;
 use dfa::{DfaBuilder, DfaOptimizer};
 use nfa::NfaBuilder;
-
-use crate::lexer::definition::RuleId;
-
-mod codegen;
-mod definition;
-mod dfa;
-mod nfa;
-mod regex;
+use rule::{RuleId, RuleParser};
 
 /// Generates lexer source code from a lexer specification.
 /// Returns an error when definition parsing or regex parsing fails.
 pub fn generate_lexer_source(input: &str) -> Result<String, Box<dyn Error>> {
-    let definition_parser = DefinitionParser::new(input);
+    let definition_parser = RuleParser::new(input);
     let definition = definition_parser.parse();
 
     let mut nfa_builder = NfaBuilder::new();

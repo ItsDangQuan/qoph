@@ -1,16 +1,16 @@
 use crate::lexer::{
     codegen::{compressor::EquivalenceClasses, template},
-    definition::LexerDef,
     dfa::Dfa,
+    rule::Rule,
 };
 
 pub(crate) struct CodeEmitter<'a> {
-    definition: LexerDef<'a>,
+    definition: Rule<'a>,
     dfa: Dfa,
 }
 
 impl<'a> CodeEmitter<'a> {
-    pub(crate) fn new(definition: LexerDef<'a>, dfa: Dfa) -> Self {
+    pub(crate) fn new(definition: Rule<'a>, dfa: Dfa) -> Self {
         Self { definition, dfa }
     }
 
@@ -44,9 +44,12 @@ impl<'a> CodeEmitter<'a> {
 
         let payload = format!("{}\n{}", base_code, iterator_code);
 
-        let preamble = "#[rustfmt::skip]\n#[allow(dead_code)]\nmod generated {";
-        let postamble = "}\n\n#[allow(unused_imports)]\npub use generated::{Lexer, LexerError, SpannedIter, Token};\n";
-        format!("{}\n\n{}\n{}", preamble, payload, postamble)
+        format!(
+            "{}\n{}\n{}",
+            template::PREAMBLE.trim_start(),
+            payload,
+            template::POSTAMBLE.trim_start()
+        )
     }
 
     fn emit_tokens(&self) -> String {

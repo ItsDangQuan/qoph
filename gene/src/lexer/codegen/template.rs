@@ -1,3 +1,16 @@
+pub(super) const PREAMBLE: &str = r#"
+#[rustfmt::skip]
+#[allow(dead_code)]
+mod generated {
+"#;
+
+pub(super) const POSTAMBLE: &str = r#"
+}
+
+#[allow(unused_imports)]
+pub use generated::{Lexer, SpannedIter, Token};
+"#;
+
 pub(super) const LEXER_BASE: &str = r#"
 use std::ops::Range;
 
@@ -17,11 +30,6 @@ const TRANSITIONS: [[u16; {NUM_CLASSES}]; {NUM_STATES}] = [
 const ACCEPT: [Option<usize>; {NUM_STATES}] = [
 {ACCEPT}
 ];
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct LexerError {
-    pub byte_offset: usize,
-}
 
 pub struct Lexer<'a> {
     input: &'a str,
@@ -56,7 +64,7 @@ pub struct SpannedIter<'a> {
 }
 
 impl<'a> Iterator for SpannedIter<'a> {
-    type Item = (Result<Token<'a>, LexerError>, Range<usize>);
+    type Item = (Result<Token<'a>, ()>, Range<usize>);
 
     fn next(&mut self) -> Option<Self::Item> {
         let token_res = self.lexer.next()?;
@@ -68,7 +76,7 @@ impl<'a> Iterator for SpannedIter<'a> {
 
 pub(super) const ITERATOR_IMPL: &str = r#"
 impl<'a> Iterator for Lexer<'a> {
-    type Item = Result<Token<'a>, LexerError>;
+    type Item = Result<Token<'a>, ()>;
 
     fn next(&mut self) -> Option<Self::Item> {
         if self.cursor >= self.input.len() {
@@ -113,7 +121,7 @@ impl<'a> Iterator for Lexer<'a> {
         } else {
             let next_char = self.input[self.token_start..].chars().next().unwrap();
             self.cursor = self.token_start + next_char.len_utf8();
-            Some(Err(LexerError { byte_offset: self.token_start }))
+            Some(Err(()))
         }
     }
 }

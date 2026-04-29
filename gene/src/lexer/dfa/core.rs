@@ -1,4 +1,4 @@
-use crate::lexer::definition::RuleId;
+use crate::lexer::rule::RuleId;
 
 pub(crate) struct DfaState {
     pub(crate) transitions: [Option<usize>; 256],

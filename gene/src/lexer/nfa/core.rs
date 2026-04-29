@@ -1,4 +1,4 @@
-use crate::lexer::definition::RuleId;
+use crate::lexer::rule::RuleId;
 
 pub(crate) enum Transition {
     Epsilon(usize, Option<usize>),
