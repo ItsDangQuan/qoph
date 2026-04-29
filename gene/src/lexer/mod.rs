@@ -18,8 +18,6 @@ mod semantic;
 #[allow(unused_imports)]
 pub use error::{LexerCompilerDiag, LexerCompilerError};
 
-use std::error::Error;
-
 use codegen::CodeEmitter;
 use dfa::{DfaBuilder, DfaOptimizer};
 use nfa::NfaBuilder;

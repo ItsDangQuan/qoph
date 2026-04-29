@@ -26,6 +26,7 @@ pub enum LexerCompilerError {
     RegexInvalidIdentStart(char),
 
     // Semantic errors
+    NoRulesDefined,
     CollidingSymbol { name: String, span: Range<usize> },
     UndefinedSymbol(String),
     CyclicDependency(String),
@@ -77,6 +78,9 @@ impl fmt::Display for LexerCompilerError {
             }
             LexerCompilerError::RegexInvalidIdentStart(c) => {
                 write!(f, "Found invalid identifier start '{}'", c)
+            }
+            LexerCompilerError::NoRulesDefined => {
+                write!(f, "Found no token rules, expected at least one 'rule'")
             }
             LexerCompilerError::CollidingSymbol { name, .. } => {
                 write!(f, "Found colliding symbol '{}'", name)

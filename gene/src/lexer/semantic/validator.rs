@@ -69,6 +69,14 @@ impl<'a> SemanticValidator<'a> {
             return Err(self.diagnostics);
         };
 
+        if self.rules.is_empty() {
+            self.diagnostics.push(LexerCompilerDiag::new(
+                LexerCompilerError::NoRulesDefined,
+                0..0,
+            ));
+            return Err(self.diagnostics);
+        }
+
         Ok(Rule {
             fragments: resolved_fragments.into_values().collect(),
             rules: self.rules,
@@ -322,5 +330,64 @@ impl<'a> SemanticValidator<'a> {
             | RegexAst::CharacterClass(_)
             | RegexAst::ComplementClass(_) => Ok(0),
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::SemanticValidator;
+    use crate::lexer::LexerCompilerError;
+    use crate::lexer::rule::RuleParser;
+
+    #[test]
+    fn reports_undefined_fragment_in_rules() {
+        let input = r#"rule Foo = r"{Missing}";"#;
+        let (rule, diag) = RuleParser::new(input).parse();
+        assert!(diag.is_empty());
+
+        let err = SemanticValidator::new(rule, Default::default())
+            .validate()
+            .expect_err("expected undefined symbol");
+
+        assert!(
+            err.iter()
+                .any(|d| matches!(d.error(), LexerCompilerError::UndefinedSymbol(_)))
+        );
+    }
+
+    #[test]
+    fn reports_cyclic_fragment_dependencies() {
+        let input = r#"
+let A = r"{B}";
+let B = r"{A}";
+rule Foo = r"{A}";
+"#;
+        let (rule, diag) = RuleParser::new(input).parse();
+        assert!(diag.is_empty());
+
+        let err = SemanticValidator::new(rule, Default::default())
+            .validate()
+            .expect_err("expected cycle error");
+
+        assert!(
+            err.iter()
+                .any(|d| matches!(d.error(), LexerCompilerError::CyclicDependency(_)))
+        );
+    }
+
+    #[test]
+    fn reports_error_when_no_token_rules_defined() {
+        let input = r#"let Digit = r"[0-9]";"#;
+        let (rule, diag) = RuleParser::new(input).parse();
+        assert!(diag.is_empty());
+
+        let err = SemanticValidator::new(rule, Default::default())
+            .validate()
+            .expect_err("expected no-rules error");
+
+        assert!(
+            err.iter()
+                .any(|d| matches!(d.error(), LexerCompilerError::NoRulesDefined))
+        );
     }
 }

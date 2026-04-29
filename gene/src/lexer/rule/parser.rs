@@ -236,3 +236,30 @@ impl<'a> RuleParser<'a> {
         )
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::RuleParser;
+
+    #[test]
+    fn parses_fragments_skip_rules_and_actions() {
+        let input = r##"
+let Digit = r"[0-9]";
+skip rule Ws = r"[ \t\n\r]+";
+rule Number = r"{Digit}+";
+rule Ident = r"[a-zA-Z_][a-zA-Z0-9_]*" c#"Token::Ident"#;
+    "##;
+
+        let parser = RuleParser::new(input);
+        let (rule, diag) = parser.parse();
+
+        assert!(diag.is_empty());
+        assert_eq!(rule.fragments.len(), 1);
+        assert_eq!(rule.rules.len(), 3);
+
+        assert!(rule.rules[0].skip);
+        assert_eq!(rule.rules[1].name, "Number");
+        assert_eq!(rule.rules[2].name, "Ident");
+        assert_eq!(rule.rules[2].action, Some("Token::Ident"));
+    }
+}
