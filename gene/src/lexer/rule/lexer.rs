@@ -2,18 +2,18 @@
 #[allow(dead_code)]
 mod generated {
 
-use std::ops::Range;
+use std::ops::{Deref, DerefMut, Range};
 
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub enum Token<'a> {
-    LetKw(&'a str),
-    RuleKw(&'a str),
-    SkipKw(&'a str),
-    Assign(&'a str),
-    Semi(&'a str),
-    Identifier(&'a str),
-    RawRegex(&'a str),
-    CodeBlock(&'a str),
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum Token {
+    LetKw,
+    RuleKw,
+    SkipKw,
+    Assign,
+    Semi,
+    Identifier,
+    RawRegex,
+    CodeBlock,
 }
 
 const CLASS_MAP: [u8; 256] = [
@@ -127,6 +127,10 @@ impl<'a> Lexer<'a> {
     pub fn spanned(self) -> SpannedIter<'a> {
         SpannedIter { lexer: self }
     }
+
+    pub fn source(&self) -> &'a str {
+        self.input
+    }
 }
 
 pub struct SpannedIter<'a> {
@@ -134,7 +138,7 @@ pub struct SpannedIter<'a> {
 }
 
 impl<'a> Iterator for SpannedIter<'a> {
-    type Item = (Result<Token<'a>, ()>, Range<usize>);
+    type Item = (Result<Token, ()>, Range<usize>);
 
     fn next(&mut self) -> Option<Self::Item> {
         let token_res = self.lexer.next()?;
@@ -143,8 +147,22 @@ impl<'a> Iterator for SpannedIter<'a> {
     }
 }
 
+impl<'a> Deref for SpannedIter<'a> {
+    type Target = Lexer<'a>;
+
+    fn deref(&self) -> &Self::Target {
+        &self.lexer
+    }
+}
+
+impl<'a> DerefMut for SpannedIter<'a> {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.lexer
+    }
+}
+
 impl<'a> Iterator for Lexer<'a> {
-    type Item = Result<Token<'a>, ()>;
+    type Item = Result<Token, ()>;
 
     fn next(&mut self) -> Option<Self::Item> {
         if self.cursor >= self.input.len() {
@@ -183,12 +201,12 @@ impl<'a> Iterator for Lexer<'a> {
             let token = match rule_id {
                 0 => { return self.next(); },
                 1 => { return self.next(); },
-                2 => Token::LetKw(slice),
-                3 => Token::RuleKw(slice),
-                4 => Token::SkipKw(slice),
-                5 => Token::Assign(slice),
-                6 => Token::Semi(slice),
-                7 => Token::Identifier(slice),
+                2 => Token::LetKw,
+                3 => Token::RuleKw,
+                4 => Token::SkipKw,
+                5 => Token::Assign,
+                6 => Token::Semi,
+                7 => Token::Identifier,
                 8 => {
                     let hash_count = slice.len() - 2; 
                     let mut search_offset = self.cursor;
@@ -202,9 +220,11 @@ impl<'a> Iterator for Lexer<'a> {
                                 let hash_start = quote_abs_idx + 1;
                                 let hash_end = hash_start + hash_count;
 
-                                if hash_end <= self.input.len() && self.input[hash_start..hash_end].bytes().all(|b| b == b'#') {
+                                if hash_end <= self.input.len()
+                                    && self.input[hash_start..hash_end].bytes().all(|b| b == b'#')
+                                {
                                     self.cursor = hash_end;
-                                    final_token = Token::RawRegex(&self.input[self.token_start..self.cursor]);
+                                    final_token = Token::RawRegex;
                                     break;
                                 }
                                 search_offset = quote_abs_idx + 1;
@@ -230,9 +250,11 @@ impl<'a> Iterator for Lexer<'a> {
                                 let hash_start = quote_abs_idx + 1;
                                 let hash_end = hash_start + hash_count;
 
-                                if hash_end <= self.input.len() && self.input[hash_start..hash_end].bytes().all(|b| b == b'#') {
+                                if hash_end <= self.input.len()
+                                    && self.input[hash_start..hash_end].bytes().all(|b| b == b'#')
+                                {
                                     self.cursor = hash_end;
-                                    final_token = Token::CodeBlock(&self.input[self.token_start..self.cursor]);
+                                    final_token = Token::CodeBlock;
                                     break;
                                 }
                                 search_offset = quote_abs_idx + 1;

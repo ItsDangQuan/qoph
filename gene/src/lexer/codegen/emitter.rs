@@ -56,7 +56,7 @@ impl<'a> CodeEmitter<'a> {
         let mut out = String::new();
         for rule in &self.definition.rules {
             if !rule.skip {
-                out.push_str(&format!("    {}(&'a str),\n", rule.name));
+                out.push_str(&format!("    {},\n", rule.name));
             }
         }
         out.trim_end().to_string()
@@ -115,7 +115,7 @@ impl<'a> CodeEmitter<'a> {
                 out.push_str("\n                },\n");
             } else {
                 out.push_str(&format!(
-                    "                {} => Token::{}(slice),\n",
+                    "                {} => Token::{},\n",
                     id, rule.name
                 ));
             }

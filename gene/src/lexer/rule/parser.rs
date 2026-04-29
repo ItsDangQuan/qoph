@@ -8,7 +8,7 @@ use super::lexer::{Lexer, Token};
 
 pub(crate) struct RuleParser<'a> {
     lexer: Lexer<'a>,
-    peeked: Option<(Token<'a>, Range<usize>)>,
+    peeked: Option<(Token, Range<usize>)>,
     fragments: Vec<FragmentRule<'a>>,
     rules: Vec<TokenRule<'a>>,
     pub(crate) diag: Vec<LexerCompilerDiag>,
@@ -73,8 +73,9 @@ impl<'a> RuleParser<'a> {
     }
 
     fn expect_ident(&mut self) -> Result<(&'a str, Range<usize>), ()> {
-        if let Some((Token::Identifier(name), span)) = &self.peeked {
-            let res = (*name, span.clone());
+        if let Some((Token::Identifier, span)) = &self.peeked {
+            let slice = &self.lexer.source()[span.clone()];
+            let res = (slice, span.clone());
             self.advance();
             Ok(res)
         } else {
@@ -84,7 +85,7 @@ impl<'a> RuleParser<'a> {
     }
 
     fn expect_assign(&mut self) -> Result<Range<usize>, ()> {
-        if let Some((Token::Assign(_), span)) = &self.peeked {
+        if let Some((Token::Assign, span)) = &self.peeked {
             let res = span.clone();
             self.advance();
             Ok(res)
@@ -95,8 +96,9 @@ impl<'a> RuleParser<'a> {
     }
 
     fn expect_raw_regex(&mut self) -> Result<(&'a str, Range<usize>), ()> {
-        if let Some((Token::RawRegex(slice), span)) = &self.peeked {
-            let res = (*slice, span.clone());
+        if let Some((Token::RawRegex, span)) = &self.peeked {
+            let slice = &self.lexer.source()[span.clone()];
+            let res = (slice, span.clone());
             self.advance();
             Ok(res)
         } else {
@@ -106,7 +108,7 @@ impl<'a> RuleParser<'a> {
     }
 
     fn expect_semi(&mut self) -> Result<Range<usize>, ()> {
-        if let Some((Token::Semi(_), span)) = &self.peeked {
+        if let Some((Token::Semi, span)) = &self.peeked {
             let res = span.clone();
             self.advance();
             Ok(res)
@@ -159,7 +161,8 @@ impl<'a> RuleParser<'a> {
         let (regex_slice, regex_span) = self.expect_raw_regex()?;
 
         let mut action = None;
-        if let Some((Token::CodeBlock(slice), _)) = &self.peeked {
+        if let Some((Token::CodeBlock, span)) = &self.peeked {
+            let slice = &self.lexer.source()[span.clone()];
             action = Some(Self::strip_raw_boundaries(slice).0);
             self.advance();
         }
@@ -189,7 +192,7 @@ impl<'a> RuleParser<'a> {
     /// Discards tokens until the parser reaches a safe boundary to resume analysis.
     fn synchronize(&mut self) {
         while let Some((token, _)) = &self.peeked
-            && !matches!(token, Token::LetKw(_) | Token::RuleKw(_) | Token::SkipKw(_))
+            && !matches!(token, Token::LetKw | Token::RuleKw | Token::SkipKw)
         {
             self.advance()
         }
@@ -198,15 +201,15 @@ impl<'a> RuleParser<'a> {
     pub(crate) fn parse(mut self) -> (Rule<'a>, Vec<LexerCompilerDiag>) {
         while let Some((peeked_token, _)) = &self.peeked {
             let res = match peeked_token {
-                Token::LetKw(_) => self.parse_let_decl(),
-                Token::RuleKw(_) => {
+                Token::LetKw => self.parse_let_decl(),
+                Token::RuleKw => {
                     let start = self.peek_span();
                     self.parse_rule_decl(false, start)
                 }
-                Token::SkipKw(_) => {
+                Token::SkipKw => {
                     let start = self.peek_span();
                     self.advance();
-                    if let Some((Token::RuleKw(_), _)) = &self.peeked {
+                    if let Some((Token::RuleKw, _)) = &self.peeked {
                         self.parse_rule_decl(true, start)
                     } else {
                         self.report_unexpected("keyword 'rule'");

@@ -12,10 +12,10 @@ pub use generated::{Lexer, SpannedIter, Token};
 "#;
 
 pub(super) const LEXER_BASE: &str = r#"
-use std::ops::Range;
+use std::ops::{Deref, DerefMut, Range};
 
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub enum Token<'a> {
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum Token {
 {TOKENS}
 }
 
@@ -57,6 +57,10 @@ impl<'a> Lexer<'a> {
     pub fn spanned(self) -> SpannedIter<'a> {
         SpannedIter { lexer: self }
     }
+
+    pub fn source(&self) -> &'a str {
+        self.input
+    }
 }
 
 pub struct SpannedIter<'a> {
@@ -64,7 +68,7 @@ pub struct SpannedIter<'a> {
 }
 
 impl<'a> Iterator for SpannedIter<'a> {
-    type Item = (Result<Token<'a>, ()>, Range<usize>);
+    type Item = (Result<Token, ()>, Range<usize>);
 
     fn next(&mut self) -> Option<Self::Item> {
         let token_res = self.lexer.next()?;
@@ -72,11 +76,25 @@ impl<'a> Iterator for SpannedIter<'a> {
         Some((token_res, span))
     }
 }
+
+impl<'a> Deref for SpannedIter<'a> {
+    type Target = Lexer<'a>;
+
+    fn deref(&self) -> &Self::Target {
+        &self.lexer
+    }
+}
+
+impl<'a> DerefMut for SpannedIter<'a> {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.lexer
+    }
+}
 "#;
 
 pub(super) const ITERATOR_IMPL: &str = r#"
 impl<'a> Iterator for Lexer<'a> {
-    type Item = Result<Token<'a>, ()>;
+    type Item = Result<Token, ()>;
 
     fn next(&mut self) -> Option<Self::Item> {
         if self.cursor >= self.input.len() {
