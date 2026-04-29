@@ -27,7 +27,12 @@ fn main() -> Result<(), Box<dyn Error>> {
         rule Number = r"[0-9]+(\.[0-9]+)?";
     "#;
 
-    let generated_rust_code = gene::generate_lexer_source(lex_spec)?;
+    let generated_rust_code = gene::generate_lexer_source(lex_spec, None).map_err(|errs| {
+        errs.iter()
+            .map(|err| err.to_string())
+            .collect::<Vec<_>>()
+            .join("\n")
+    })?;
 
     let out_dir = env::var_os("OUT_DIR").unwrap();
     let dest_path = Path::new(&out_dir).join("lexer.rs");
