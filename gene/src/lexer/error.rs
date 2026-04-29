@@ -26,8 +26,10 @@ pub enum LexerCompilerError {
     RegexInvalidIdentStart(char),
 
     // Semantic errors
-    CollidingName { name: String, span: Range<usize> },
-    UndefinedName(String),
+    CollidingSymbol { name: String, span: Range<usize> },
+    UndefinedSymbol(String),
+    CyclicDependency(String),
+    ExpansionDepthExceeded { limit: usize },
 }
 
 impl fmt::Display for LexerCompilerError {
@@ -76,11 +78,17 @@ impl fmt::Display for LexerCompilerError {
             LexerCompilerError::RegexInvalidIdentStart(c) => {
                 write!(f, "Found invalid identifier start '{}'", c)
             }
-            LexerCompilerError::CollidingName { name, .. } => {
-                write!(f, "Found colliding name '{}'", name)
+            LexerCompilerError::CollidingSymbol { name, .. } => {
+                write!(f, "Found colliding symbol '{}'", name)
             }
-            LexerCompilerError::UndefinedName(name) => {
-                write!(f, "Found undefined name '{}'", name)
+            LexerCompilerError::UndefinedSymbol(name) => {
+                write!(f, "Found undefined symbol '{}'", name)
+            }
+            LexerCompilerError::CyclicDependency(name) => {
+                write!(f, "Found cyclical reference '{}'", name)
+            }
+            LexerCompilerError::ExpansionDepthExceeded { limit } => {
+                write!(f, "Nested fragments depth limit ({}) exceeded", limit)
             }
         }
     }

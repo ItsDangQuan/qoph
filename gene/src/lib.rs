@@ -2,4 +2,4 @@
 
 mod lexer;
 
-pub use lexer::generate_lexer_source;
+pub use lexer::{LexerCompilerOptions, generate_lexer_source};
