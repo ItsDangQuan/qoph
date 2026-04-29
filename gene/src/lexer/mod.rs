@@ -14,7 +14,8 @@ mod nfa;
 mod regex;
 mod rule;
 
-pub(crate) use error::LexerCompilerError;
+#[allow(unused_imports)]
+pub use error::{LexerCompilerDiag, LexerCompilerError};
 
 use std::error::Error;
 
@@ -26,12 +27,12 @@ use rule::{RuleId, RuleParser};
 /// Generates lexer source code from a lexer specification.
 /// Returns an error when definition parsing or regex parsing fails.
 pub fn generate_lexer_source(input: &str) -> Result<String, Box<dyn Error>> {
-    let definition_parser = RuleParser::new(input);
-    let definition = definition_parser.parse();
+    let rule_parser = RuleParser::new(input);
+    let (rule, _) = rule_parser.parse();
 
     let mut nfa_builder = NfaBuilder::new();
 
-    for (id, rule) in definition.rules.iter().enumerate() {
+    for (id, rule) in rule.rules.iter().enumerate() {
         nfa_builder.add_rule(&rule.ast, RuleId(id));
     }
 
@@ -43,7 +44,7 @@ pub fn generate_lexer_source(input: &str) -> Result<String, Box<dyn Error>> {
     let dfa_optimizer = DfaOptimizer::new(unminimized_dfa);
     let optimized_dfa = dfa_optimizer.optimize();
 
-    let emitter = CodeEmitter::new(definition, optimized_dfa);
+    let emitter = CodeEmitter::new(rule, optimized_dfa);
     let source = emitter.emit();
     Ok(source)
 }

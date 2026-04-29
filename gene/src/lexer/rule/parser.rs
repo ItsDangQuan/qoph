@@ -1,19 +1,17 @@
-use std::collections::HashMap;
 use std::ops::Range;
 
-use crate::lexer::{
-    regex::RegexParser,
-    rule::{
-        core::{FragmentRule, Rule, TokenRule},
-        lexer::{Lexer, Token},
-    },
-};
+use crate::lexer::regex::RegexParser;
+use crate::lexer::{LexerCompilerDiag, LexerCompilerError};
+
+use super::core::{FragmentRule, Rule, TokenRule};
+use super::lexer::{Lexer, Token};
 
 pub(crate) struct RuleParser<'a> {
     lexer: Lexer<'a>,
     peeked: Option<(Token<'a>, Range<usize>)>,
-    fragments: HashMap<&'a str, FragmentRule<'a>>,
+    fragments: Vec<FragmentRule<'a>>,
     rules: Vec<TokenRule<'a>>,
+    pub(crate) diag: Vec<LexerCompilerDiag>,
 }
 
 impl<'a> RuleParser<'a> {
@@ -21,148 +19,217 @@ impl<'a> RuleParser<'a> {
         let mut parser = Self {
             lexer: Lexer::new(input),
             peeked: None,
-            fragments: HashMap::new(),
+            fragments: Vec::new(),
             rules: Vec::new(),
+            diag: Vec::new(),
         };
         parser.advance();
         parser
     }
 
-    /// Fetches next token, panics on lexer failure.
-    /// (Trivia is now natively skipped by the Lexer runtime).
-    fn advance(&mut self) -> Option<(Token<'a>, Range<usize>)> {
-        let previous = self.peeked.take();
-
-        match self.lexer.next() {
-            Some(Ok(token)) => {
-                self.peeked = Some((token, self.lexer.span()));
-            }
-            Some(Err(_)) => {
-                let Range { start, end } = self.lexer.span();
-                panic!("Fatal Lexer Error at byte range {}..{}", start, end)
-            }
-            None => {
-                self.peeked = None;
+    /// Fetches next token and accumulates lexing errors.
+    fn advance(&mut self) {
+        loop {
+            match self.lexer.next() {
+                Some(Ok(token)) => {
+                    self.peeked = Some((token, self.lexer.span()));
+                    break;
+                }
+                Some(Err(())) => self.diag.push(LexerCompilerDiag::new(
+                    LexerCompilerError::UnrecognizedToken,
+                    self.lexer.span(),
+                )),
+                None => {
+                    self.peeked = None;
+                    break;
+                }
             }
         }
+    }
 
-        previous
+    fn peek_span(&self) -> Range<usize> {
+        self.peeked
+            .as_ref()
+            .map(|(_, span)| span.clone())
+            .unwrap_or_else(|| self.lexer.span())
+    }
+
+    fn report_unexpected(&mut self, expected: &str) {
+        if let Some((_, span)) = &self.peeked {
+            self.diag.push(LexerCompilerDiag::new(
+                LexerCompilerError::UnexpectedToken {
+                    expected: expected.to_string(),
+                },
+                span.clone(),
+            ));
+        } else {
+            self.diag.push(LexerCompilerDiag::new(
+                LexerCompilerError::UnexpectedEof {
+                    expected: expected.to_string(),
+                },
+                self.lexer.span(),
+            ))
+        }
+    }
+
+    fn expect_ident(&mut self) -> Result<(&'a str, Range<usize>), ()> {
+        if let Some((Token::Identifier(name), span)) = &self.peeked {
+            let res = (*name, span.clone());
+            self.advance();
+            Ok(res)
+        } else {
+            self.report_unexpected("identifier");
+            Err(())
+        }
+    }
+
+    fn expect_assign(&mut self) -> Result<Range<usize>, ()> {
+        if let Some((Token::Assign(_), span)) = &self.peeked {
+            let res = span.clone();
+            self.advance();
+            Ok(res)
+        } else {
+            self.report_unexpected("'='");
+            Err(())
+        }
+    }
+
+    fn expect_raw_regex(&mut self) -> Result<(&'a str, Range<usize>), ()> {
+        if let Some((Token::RawRegex(slice), span)) = &self.peeked {
+            let res = (*slice, span.clone());
+            self.advance();
+            Ok(res)
+        } else {
+            self.report_unexpected("regular expression");
+            Err(())
+        }
+    }
+
+    fn expect_semi(&mut self) -> Result<Range<usize>, ()> {
+        if let Some((Token::Semi(_), span)) = &self.peeked {
+            let res = span.clone();
+            self.advance();
+            Ok(res)
+        } else {
+            self.report_unexpected("';'");
+            Err(())
+        }
     }
 
     /// Helper to dynamically strip raw string boundaries (r#"..."# or c#"..."#)
-    fn strip_raw_boundaries(slice: &'a str) -> &'a str {
-        let quote_idx = slice.find('"').expect("Raw string must contain a quote");
+    fn strip_raw_boundaries(slice: &'a str) -> (&'a str, usize) {
+        let quote_idx = slice.find('"').expect("raw string must contain a quote");
         let prefix_len = quote_idx + 1;
-        let suffix_len = quote_idx; // e.g., r#" is 3 bytes, "# is 2 bytes. (3 - 1 = 2)
-        &slice[prefix_len..slice.len() - suffix_len]
+        let suffix_len = quote_idx;
+        (&slice[prefix_len..slice.len() - suffix_len], prefix_len)
     }
 
-    fn parse_let_decl(&mut self) {
-        let ident_str = match self.advance().unwrap().0 {
-            Token::Identifier(name) => name,
-            found => panic!("Expected Identifier, found {:?}", found),
-        };
+    fn parse_let_decl(&mut self) -> Result<(), ()> {
+        let start_span = self.peek_span();
+        self.advance();
 
-        match self.advance().unwrap().0 {
-            Token::Assign(_) => {}
-            found => panic!("Expected Assign, found {:?}", found),
-        }
+        let (name, name_span) = self.expect_ident()?;
+        self.expect_assign()?;
+        let (regex_slice, regex_span) = self.expect_raw_regex()?;
+        let end_span = self.expect_semi()?;
 
-        let regex_slice = match self.advance().unwrap().0 {
-            Token::RawRegex(slice) => slice,
-            found => panic!("Expected RawRegex, found {:?}", found),
-        };
+        let full_span = start_span.start..end_span.end;
 
-        match self.advance().unwrap().0 {
-            Token::Semi(_) => {}
-            found => panic!("Expected Semi, found {:?}", found),
-        }
+        let (inner_regex, offset) = Self::strip_raw_boundaries(regex_slice);
+        let absolute_start = regex_span.start + offset;
 
-        let inner_regex = Self::strip_raw_boundaries(regex_slice);
-        let ast = RegexParser::new(inner_regex, 0).parse().unwrap();
-
-        self.fragments.insert(
-            ident_str,
-            FragmentRule {
-                name: ident_str,
+        match RegexParser::new(inner_regex, absolute_start).parse() {
+            Ok(ast) => self.fragments.push(FragmentRule {
+                name,
+                name_span,
                 ast,
-                span: 0..0, // Set up spans later if diagnostic tracking is required
-            },
-        );
-    }
-
-    fn parse_rule_decl(&mut self, skip: bool) {
-        let ident_str = match self.advance().unwrap().0 {
-            Token::Identifier(name) => name,
-            found => panic!("Expected Identifier, found {:?}", found),
-        };
-
-        match self.advance().unwrap().0 {
-            Token::Assign(_) => {}
-            found => panic!("Expected Assign, found {:?}", found),
+                full_span,
+            }),
+            Err((error, span)) => self.diag.push(LexerCompilerDiag::new(error, span)),
         }
 
-        let regex_slice = match self.advance().unwrap().0 {
-            Token::RawRegex(slice) => slice,
-            found => panic!("Expected RawRegex, found {:?}", found),
-        };
+        Ok(())
+    }
 
-        // Optional Code Block Lookahead
-        let action = if let Some((peeked_token, _)) = &self.peeked
-            && let Token::CodeBlock(slice) = peeked_token
+    fn parse_rule_decl(&mut self, skip: bool, start_span: Range<usize>) -> Result<(), ()> {
+        self.advance();
+
+        let (name, name_span) = self.expect_ident()?;
+        self.expect_assign()?;
+        let (regex_slice, regex_span) = self.expect_raw_regex()?;
+
+        let mut action = None;
+        if let Some((Token::CodeBlock(slice), _)) = &self.peeked {
+            action = Some(Self::strip_raw_boundaries(slice).0);
+            self.advance();
+        }
+
+        let end_span = self.expect_semi()?;
+
+        let full_span = start_span.start..end_span.end;
+
+        let (inner_regex, offset) = Self::strip_raw_boundaries(regex_slice);
+        let absolute_start = regex_span.start + offset;
+
+        match RegexParser::new(inner_regex, absolute_start).parse() {
+            Ok(ast) => self.rules.push(TokenRule {
+                name,
+                name_span,
+                ast,
+                action,
+                skip,
+                full_span,
+            }),
+            Err((error, span)) => self.diag.push(LexerCompilerDiag::new(error, span)),
+        }
+
+        Ok(())
+    }
+
+    /// Discards tokens until the parser reaches a safe boundary to resume analysis.
+    fn synchronize(&mut self) {
+        while let Some((token, _)) = &self.peeked
+            && !matches!(token, Token::LetKw(_) | Token::RuleKw(_) | Token::SkipKw(_))
         {
-            let code_slice = *slice;
-            self.advance(); // Consume the code block token
-            Some(Self::strip_raw_boundaries(code_slice))
-        } else {
-            None
-        };
-
-        match self.advance().unwrap().0 {
-            Token::Semi(_) => {}
-            found => panic!("Expected Semi, found {:?}", found),
+            self.advance()
         }
-
-        let inner_regex = Self::strip_raw_boundaries(regex_slice);
-        let ast = RegexParser::new(inner_regex, 0).parse().unwrap();
-
-        self.rules.push(TokenRule {
-            name: ident_str,
-            ast,
-            action,
-            skip,
-        });
     }
 
-    pub(crate) fn parse(mut self) -> Rule<'a> {
+    pub(crate) fn parse(mut self) -> (Rule<'a>, Vec<LexerCompilerDiag>) {
         while let Some((peeked_token, _)) = &self.peeked {
-            match peeked_token {
-                Token::LetKw(_) => {
-                    self.advance();
-                    self.parse_let_decl();
-                }
+            let res = match peeked_token {
+                Token::LetKw(_) => self.parse_let_decl(),
                 Token::RuleKw(_) => {
-                    self.advance();
-                    self.parse_rule_decl(false);
+                    let start = self.peek_span();
+                    self.parse_rule_decl(false, start)
                 }
                 Token::SkipKw(_) => {
+                    let start = self.peek_span();
                     self.advance();
-                    match self.advance().unwrap().0 {
-                        Token::RuleKw(_) => {}
-                        found => panic!("Expected RuleKw after SkipKw, found {:?}", found),
+                    if let Some((Token::RuleKw(_), _)) = &self.peeked {
+                        self.parse_rule_decl(true, start)
+                    } else {
+                        self.report_unexpected("keyword 'rule'");
+                        Err(())
                     }
-                    self.parse_rule_decl(true);
                 }
-                _ => panic!(
-                    "Expected 'let', 'rule', or 'skip', found {:?}",
-                    peeked_token
-                ),
+                _ => {
+                    self.report_unexpected("keyword 'let', 'rule', or 'skip'");
+                    Err(())
+                }
+            };
+
+            if res.is_err() {
+                self.synchronize();
             }
         }
 
-        Rule {
-            fragments: self.fragments,
-            rules: self.rules,
-        }
+        (
+            Rule {
+                fragments: self.fragments,
+                rules: self.rules,
+            },
+            self.diag,
+        )
     }
 }

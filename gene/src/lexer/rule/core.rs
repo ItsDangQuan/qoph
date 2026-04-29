@@ -1,4 +1,3 @@
-use std::collections::HashMap;
 use std::ops::Range;
 
 use crate::lexer::regex::RegexAst;
@@ -6,7 +5,7 @@ use crate::lexer::regex::RegexAst;
 #[derive(Debug, Clone)]
 pub(crate) struct Rule<'a> {
     /// Reusable regex macro fragments.
-    pub(crate) fragments: HashMap<&'a str, FragmentRule<'a>>,
+    pub(crate) fragments: Vec<FragmentRule<'a>>,
 
     /// The ordered sequence of token rules.
     pub(crate) rules: Vec<TokenRule<'a>>,
@@ -15,17 +14,20 @@ pub(crate) struct Rule<'a> {
 #[derive(Debug, Clone)]
 pub(crate) struct FragmentRule<'a> {
     pub(crate) name: &'a str,
+    pub(crate) name_span: Range<usize>,
     pub(crate) ast: RegexAst<'a>,
-    pub(crate) span: Range<usize>,
+    pub(crate) full_span: Range<usize>,
 }
 
 #[derive(Debug, Clone)]
 pub(crate) struct TokenRule<'a> {
     pub(crate) name: &'a str,
+    pub(crate) name_span: Range<usize>,
     pub(crate) ast: RegexAst<'a>,
     /// The optional Rust code block (escape hatch) for context-sensitive evaluation.
     pub(crate) action: Option<&'a str>,
     pub(crate) skip: bool,
+    pub(crate) full_span: Range<usize>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]

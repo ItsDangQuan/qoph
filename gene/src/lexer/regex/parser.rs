@@ -28,10 +28,12 @@ impl<'a> RegexParser<'a> {
         let ast = self.parse_alternation()?;
 
         let loc = self.current_location();
-        if let Some(c) = self.next() {
+        if self.peek().is_some() {
+            let trailing = self.input[self.cursor..].to_string();
+            let len = trailing.len();
             return Err((
-                LexerCompilerError::RegexUnexpectedTrailingChars,
-                loc..self.current_location(),
+                LexerCompilerError::RegexUnexpectedTrailingChars(trailing),
+                loc..loc + len,
             ));
         }
 
@@ -518,7 +520,10 @@ mod tests {
     #[test]
     fn unexpected_trailing_chars_reports_error() {
         let err = parse_err("a)");
-        assert_eq!(err.0, LexerCompilerError::RegexUnexpectedTrailingChars);
+        assert_eq!(
+            err.0,
+            LexerCompilerError::RegexUnexpectedTrailingChars(")".to_string())
+        );
         assert_eq!(err.1, 1..2);
     }
 

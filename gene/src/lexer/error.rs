@@ -9,11 +9,11 @@ pub enum LexerCompilerError {
     UnrecognizedToken,
 
     // Parsing errors
-    UnexpectedToken { expected: String, found: String },
+    UnexpectedToken { expected: String }, // Can be improved
     UnexpectedEof { expected: String },
 
     // Regex parsing errors
-    RegexUnexpectedTrailingChars,
+    RegexUnexpectedTrailingChars(String),
     RegexUnclosedGrouping,
     RegexUnclosedCharClass,
     RegexUnclosedFragmentRef,
@@ -27,7 +27,7 @@ pub enum LexerCompilerError {
 
     // Semantic errors
     CollidingName { name: String, span: Range<usize> },
-    UndefinedFragment(String),
+    UndefinedName(String),
 }
 
 impl fmt::Display for LexerCompilerError {
@@ -37,14 +37,14 @@ impl fmt::Display for LexerCompilerError {
                 // can be improved
                 write!(f, "Found unrecognized character or unclosed sequence")
             }
-            LexerCompilerError::UnexpectedToken { expected, found } => {
-                write!(f, "Found {}, expected {}", found, expected)
+            LexerCompilerError::UnexpectedToken { expected } => {
+                write!(f, "Found unexpected token, expected {}", expected)
             }
             LexerCompilerError::UnexpectedEof { expected } => {
                 write!(f, "Found end of file, expected {}", expected)
             }
-            LexerCompilerError::RegexUnexpectedTrailingChars => {
-                write!(f, "Found unexpected trailing character after expression")
+            LexerCompilerError::RegexUnexpectedTrailingChars(trailing) => {
+                write!(f, "Found unexpected trailing characters '{}'", trailing)
             }
             LexerCompilerError::RegexUnclosedGrouping => {
                 write!(f, "Found unclosed grouping, expected ')'")
@@ -79,8 +79,8 @@ impl fmt::Display for LexerCompilerError {
             LexerCompilerError::CollidingName { name, .. } => {
                 write!(f, "Found colliding name '{}'", name)
             }
-            LexerCompilerError::UndefinedFragment(name) => {
-                write!(f, "Found undefined fragment '{}'", name)
+            LexerCompilerError::UndefinedName(name) => {
+                write!(f, "Found undefined name '{}'", name)
             }
         }
     }
@@ -95,12 +95,18 @@ pub struct LexerCompilerDiag {
 }
 
 impl LexerCompilerDiag {
+    pub(crate) fn new(error: LexerCompilerError, span: Range<usize>) -> Self {
+        Self { error, span }
+    }
+
+    #[allow(dead_code)]
     pub fn error(&self) -> &LexerCompilerError {
         &self.error
     }
 
-    pub fn span(&self) -> &Range<usize> {
-        &self.span
+    #[allow(dead_code)]
+    pub fn span(&self) -> Range<usize> {
+        self.span.clone()
     }
 }
 
