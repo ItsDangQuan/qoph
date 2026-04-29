@@ -4,10 +4,10 @@ use crate::lexer::regex::RegexParser;
 use crate::lexer::{LexerCompilerDiag, LexerCompilerError};
 
 use super::core::{FragmentRule, Rule, TokenRule};
-use super::lexer::{Lexer, Token};
+use super::lexer::{Lexer, SpannedIter, Token};
 
 pub(crate) struct RuleParser<'a> {
-    lexer: Lexer<'a>,
+    lexer: SpannedIter<'a>,
     peeked: Option<(Token, Range<usize>)>,
     fragments: Vec<FragmentRule<'a>>,
     rules: Vec<TokenRule<'a>>,
@@ -17,7 +17,7 @@ pub(crate) struct RuleParser<'a> {
 impl<'a> RuleParser<'a> {
     pub(crate) fn new(input: &'a str) -> Self {
         let mut parser = Self {
-            lexer: Lexer::new(input),
+            lexer: Lexer::new(input).spanned(),
             peeked: None,
             fragments: Vec::new(),
             rules: Vec::new(),
@@ -31,13 +31,13 @@ impl<'a> RuleParser<'a> {
     fn advance(&mut self) {
         loop {
             match self.lexer.next() {
-                Some(Ok(token)) => {
-                    self.peeked = Some((token, self.lexer.span()));
+                Some((Ok(token), span)) => {
+                    self.peeked = Some((token, span));
                     break;
                 }
-                Some(Err(())) => self.diag.push(LexerCompilerDiag::new(
+                Some((Err(()), span)) => self.diag.push(LexerCompilerDiag::new(
                     LexerCompilerError::UnrecognizedToken,
-                    self.lexer.span(),
+                    span,
                 )),
                 None => {
                     self.peeked = None;
