@@ -99,14 +99,14 @@ fn generated_lexer_compiles_and_runs() {
 fn generated_code_includes_action_and_excludes_skip_token() {
     let spec = r##"
         skip rule Ws = r"[ \t]+";
-        rule Word = r"[a-z]+" c#"Token::Word"#;
+        rule Word = r"[a-z]+" => crate::handle_word;
     "##;
 
     let output = generate_lexer_source(spec, None).expect("codegen failed");
     assert!(output.contains("enum Token"));
     assert!(output.contains("Word"));
     assert!(!output.contains("Ws"));
-    assert!(output.contains("Token::Word"));
+    assert!(output.contains("crate::handle_word("));
 }
 
 #[test]
@@ -159,11 +159,22 @@ fn generated_lexer_reports_errors_and_spans() {
 fn generated_lexer_executes_actions() {
     let spec = r##"
         skip rule Ws = r"[ \t\n\r]+";
-        rule Word = r"[a-z]+" c#"Token::Word"#;
+        rule Word = r"[a-z]+" -> crate::handle_word;
     "##;
 
     let main_body = r#"
+        use std::collections::VecDeque;
         use generated::{Lexer, Token};
+
+        pub fn handle_word(
+            _slice: &str,
+            _remainder: &str,
+            _state: &mut (),
+            _buffer: &mut VecDeque<Token>
+        ) -> Result<(Token, usize), ()> {
+            Ok((Token::Word, 0))
+        }
+        
         let input = "hello";
         let mut lexer = Lexer::new(input);
         let mut tokens = Vec::new();
