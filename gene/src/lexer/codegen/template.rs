@@ -12,6 +12,7 @@ pub use generated::{Lexer, SpannedIter, Token};
 "#;
 
 pub(super) const LEXER_BASE: &str = r#"
+use std::collections::VecDeque;
 use std::ops::{Deref, DerefMut, Range};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -35,6 +36,7 @@ pub struct Lexer<'a> {
     input: &'a str,
     cursor: usize,
     token_start: usize,
+    buffer: VecDeque<Token>,
 }
 
 impl<'a> Lexer<'a> {
@@ -43,6 +45,7 @@ impl<'a> Lexer<'a> {
             input,
             cursor: 0,
             token_start: 0,
+            buffer: VecDeque::new(),
         }
     }
 
@@ -97,6 +100,10 @@ impl<'a> Iterator for Lexer<'a> {
     type Item = Result<Token, ()>;
 
     fn next(&mut self) -> Option<Self::Item> {
+        if let Some(token) = self.buffer.pop_front() {
+            return Some(Ok(token));
+        }
+
         if self.cursor >= self.input.len() {
             return None;
         }
