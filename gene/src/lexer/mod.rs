@@ -15,7 +15,6 @@ mod regex;
 mod rule;
 mod semantic;
 
-#[allow(unused_imports)]
 pub use error::{LexerCompilerDiag, LexerCompilerError};
 
 use codegen::CodeEmitter;

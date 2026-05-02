@@ -27,7 +27,7 @@ impl DfaOptimizer {
     fn build_reverse_transitions(&self) -> Vec<Vec<Vec<usize>>> {
         let mut reverse = vec![vec![Vec::new(); 256]; self.num_states];
         for src in 0..self.num_states {
-            #[allow(clippy::needless_range_loop)]
+            #[expect(clippy::needless_range_loop)]
             for byte in 0..=255 {
                 if let Some(target) = self.dfa.states[src].transitions[byte] {
                     reverse[target][byte].push(src);
@@ -71,7 +71,7 @@ impl DfaOptimizer {
         while let Some(splitter_idx) = worklist.pop_front() {
             in_worklist[splitter_idx] = false;
 
-            #[allow(clippy::needless_range_loop)]
+            #[expect(clippy::needless_range_loop)]
             for byte in 0..=255 {
                 let mut incoming_states: BTreeSet<usize> = BTreeSet::new();
                 for &state in &partitions[splitter_idx] {

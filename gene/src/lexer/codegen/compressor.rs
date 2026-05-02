@@ -12,7 +12,7 @@ impl EquivalenceClasses {
         let mut class_map = [0u8; 256];
         let mut unique_columns = Vec::new();
 
-        #[allow(clippy::needless_range_loop)]
+        #[expect(clippy::needless_range_loop)]
         for byte in 0..=255 {
             let mut column = Vec::with_capacity(num_states);
             for state in &dfa.states {

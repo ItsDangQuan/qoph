@@ -111,12 +111,10 @@ impl LexerCompilerDiag {
         Self { error, span }
     }
 
-    #[allow(dead_code)]
     pub fn error(&self) -> &LexerCompilerError {
         &self.error
     }
 
-    #[allow(dead_code)]
     pub fn span(&self) -> Range<usize> {
         self.span.clone()
     }
