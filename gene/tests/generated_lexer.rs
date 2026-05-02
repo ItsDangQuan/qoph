@@ -15,14 +15,17 @@ fn temp_dir(prefix: &str) -> PathBuf {
     env::temp_dir().join(format!("{}_{}", prefix, nanos))
 }
 
-fn compile_and_run(spec: &str, main_body: &str) {
+fn compile_and_run(spec: &str, top_level: &str, main_body: &str) {
     let generated = generate_lexer_source(spec, None).expect("codegen failed");
 
     let dir = temp_dir("gene_lexer");
     fs::create_dir_all(&dir).expect("failed to create temp dir");
 
     let main_path = dir.join("main.rs");
-    let main_src = format!("{}\n\nfn main() {{\n{}\n}}\n", generated, main_body);
+    let main_src = format!(
+        "{}\n{}\nfn main() {{\n{}\n}}\n",
+        generated, top_level, main_body
+    );
     fs::write(&main_path, main_src).expect("failed to write main.rs");
 
     let mut exe_path = dir.join("lexer_smoke");
@@ -92,7 +95,7 @@ fn generated_lexer_compiles_and_runs() {
         }
     "#;
 
-    compile_and_run(spec, main_body);
+    compile_and_run(spec, "", main_body);
 }
 
 #[test]
@@ -152,19 +155,18 @@ fn generated_lexer_reports_errors_and_spans() {
         }
     "#;
 
-    compile_and_run(spec, main_body);
+    compile_and_run(spec, "", main_body);
 }
 
 #[test]
 fn generated_lexer_executes_actions() {
     let spec = r##"
         skip rule Ws = r"[ \t\n\r]+";
-        rule Word = r"[a-z]+" -> crate::handle_word;
+        rule Word = r"[a-z]+" => crate::handle_word;
     "##;
 
-    let main_body = r#"
+    let top_level = r#"
         use std::collections::VecDeque;
-        use generated::{Lexer, Token};
 
         pub fn handle_word(
             _slice: &str,
@@ -174,7 +176,9 @@ fn generated_lexer_executes_actions() {
         ) -> Result<(Token, usize), ()> {
             Ok((Token::Word, 0))
         }
-        
+    "#;
+
+    let main_body = r#"
         let input = "hello";
         let mut lexer = Lexer::new(input);
         let mut tokens = Vec::new();
@@ -192,5 +196,5 @@ fn generated_lexer_executes_actions() {
         }
     "#;
 
-    compile_and_run(spec, main_body);
+    compile_and_run(spec, top_level, main_body);
 }

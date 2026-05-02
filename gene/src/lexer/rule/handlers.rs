@@ -2,7 +2,7 @@ use std::collections::VecDeque;
 
 use crate::lexer::rule::lexer::Token;
 
-pub(crate) fn handler_raw_regex(
+pub(crate) fn handle_raw_regex(
     slice: &str,
     remainder: &str,
     _state: &mut (),

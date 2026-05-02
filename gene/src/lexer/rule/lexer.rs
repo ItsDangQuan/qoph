@@ -123,6 +123,7 @@ pub struct Lexer<'a> {
     cursor: usize,
     token_start: usize,
     buffer: VecDeque<Token>,
+    pub state: (),
 }
 
 impl<'a> Lexer<'a> {
@@ -132,6 +133,7 @@ impl<'a> Lexer<'a> {
             cursor: 0,
             token_start: 0,
             buffer: VecDeque::new(),
+            state: (),
         }
     }
 
@@ -219,7 +221,9 @@ impl<'a> Iterator for Lexer<'a> {
 
         if let Some(rule_id) = last_accept_state {
             self.cursor = last_accept_cursor;
+
             let slice = &self.input[self.token_start..self.cursor];
+            let remainder = &self.input[self.cursor..];
 
             let token = match rule_id {
                 0 => { return self.next(); },
@@ -234,34 +238,13 @@ impl<'a> Iterator for Lexer<'a> {
                 9 => Token::Identifier,
                 10 => Token::Path,
                 11 => {
-                    let hash_count = slice.len() - 2; 
-                    let mut search_offset = self.cursor;
-                    let final_token;
-
-                    loop {
-                        let window = &self.input[search_offset..];
-                        match window.find('"') {
-                            Some(quote_rel_idx) => {
-                                let quote_abs_idx = search_offset + quote_rel_idx;
-                                let hash_start = quote_abs_idx + 1;
-                                let hash_end = hash_start + hash_count;
-
-                                if hash_end <= self.input.len()
-                                    && self.input[hash_start..hash_end].bytes().all(|b| b == b'#')
-                                {
-                                    self.cursor = hash_end;
-                                    final_token = Token::RawRegex;
-                                    break;
-                                }
-                                search_offset = quote_abs_idx + 1;
-                            }
-                            None => {
-                                self.cursor = self.input.len();
-                                return Some(Err(()));
-                            }
-                        }
-                    }
-                    final_token
+                    let Ok((tok, extra)) = crate::lexer::rule::handlers::handle_raw_regex(
+                        slice, remainder, &mut self.state, &mut self.buffer
+                    ) else {
+                        return Some(Err(()));
+                    };
+                    self.cursor += extra;
+                    tok
                 },
                 _ => unreachable!(),
             };

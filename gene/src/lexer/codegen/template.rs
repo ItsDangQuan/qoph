@@ -114,9 +114,11 @@ impl<'a> DerefMut for SpannedIter<'a> {
 "#;
 
 pub(super) const CALLBACK: &str = r#"
-                    let (tok, extra) = {CALLBACK_PATH}(
+                    let Ok((tok, extra)) = {CALLBACK_PATH}(
                         slice, remainder, &mut self.state, &mut self.buffer
-                    )?;
+                    ) else {
+                        return Some(Err(()));
+                    };
                     self.cursor += extra;
                     tok
 "#;

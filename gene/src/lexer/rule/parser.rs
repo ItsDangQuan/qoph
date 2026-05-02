@@ -221,10 +221,10 @@ impl<'a> RuleParser<'a> {
     }
 
     pub(crate) fn parse(mut self) -> (Rule<'a>, Vec<LexerCompilerDiag>) {
-        if let Some((Token::StateKw, _)) = &self.peeked {
-            if self.parse_state_decl().is_err() {
-                self.synchronize();
-            }
+        if let Some((Token::StateKw, _)) = &self.peeked
+            && self.parse_state_decl().is_err()
+        {
+            self.synchronize();
         }
 
         while let Some((peeked_token, _)) = &self.peeked {
@@ -276,7 +276,7 @@ mod tests {
 let Digit = r"[0-9]";
 skip rule Ws = r"[ \t\n\r]+";
 rule Number = r"{Digit}+";
-rule Ident = r"[a-zA-Z_][a-zA-Z0-9_]*" c#"Token::Ident"#;
+rule Ident = r"[a-zA-Z_][a-zA-Z0-9_]*" => crate::handle_ident;
     "##;
 
         let parser = RuleParser::new(input);
@@ -289,6 +289,6 @@ rule Ident = r"[a-zA-Z_][a-zA-Z0-9_]*" c#"Token::Ident"#;
         assert!(rule.rules[0].skip);
         assert_eq!(rule.rules[1].name, "Number");
         assert_eq!(rule.rules[2].name, "Ident");
-        assert_eq!(rule.rules[2].callback, Some("Token::Ident"));
+        assert_eq!(rule.rules[2].callback, Some("crate::handle_ident"));
     }
 }
