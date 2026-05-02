@@ -11,6 +11,30 @@ pub(super) const POSTAMBLE: &str = r#"
 pub use generated::{Lexer, SpannedIter, Token};
 "#;
 
+pub(super) const NEW_DECL: &str = r#"
+    pub fn new(input: &'a str) -> Self {
+        Self {
+            input,
+            cursor: 0,
+            token_start: 0,
+            buffer: VecDeque::new(),
+            state: (),
+        }
+    }
+"#;
+
+pub(super) const WITH_STATE_DECL: &str = r#"
+    pub fn with_state(input: &'a str, state: {STATE_TYPE}) -> Self {
+        Self {
+            input,
+            cursor: 0,
+            token_start: 0,
+            buffer: VecDeque::new(),
+            state: state,
+        }
+    }
+"#;
+
 pub(super) const LEXER_BASE: &str = r#"
 use std::collections::VecDeque;
 use std::ops::{Deref, DerefMut, Range};
@@ -37,17 +61,11 @@ pub struct Lexer<'a> {
     cursor: usize,
     token_start: usize,
     buffer: VecDeque<Token>,
+    pub state: {STATE_TYPE},
 }
 
 impl<'a> Lexer<'a> {
-    pub fn new(input: &'a str) -> Self {
-        Self {
-            input,
-            cursor: 0,
-            token_start: 0,
-            buffer: VecDeque::new(),
-        }
-    }
+{CONSTRUCTOR}
 
     pub fn span(&self) -> Range<usize> {
         self.token_start..self.cursor
@@ -95,6 +113,14 @@ impl<'a> DerefMut for SpannedIter<'a> {
 }
 "#;
 
+pub(super) const CALLBACK: &str = r#"
+                    let (tok, extra) = {CALLBACK_PATH}(
+                        slice, remainder, &mut self.state, &mut self.buffer
+                    )?;
+                    self.cursor += extra;
+                    tok
+"#;
+
 pub(super) const ITERATOR_IMPL: &str = r#"
 impl<'a> Iterator for Lexer<'a> {
     type Item = Result<Token, ()>;
@@ -135,7 +161,9 @@ impl<'a> Iterator for Lexer<'a> {
 
         if let Some(rule_id) = last_accept_state {
             self.cursor = last_accept_cursor;
+
             let slice = &self.input[self.token_start..self.cursor];
+            let remainder = &self.input[self.cursor..];
 
             let token = match rule_id {
 {MATCH_ARMS}

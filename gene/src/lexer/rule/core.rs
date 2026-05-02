@@ -4,6 +4,9 @@ use crate::lexer::regex::RegexAst;
 
 #[derive(Debug, Clone)]
 pub(crate) struct Rule<'a> {
+    /// The path to the custom states.
+    pub(crate) state_type: Option<&'a str>,
+
     /// Reusable regex macro fragments.
     pub(crate) fragments: Vec<FragmentRule<'a>>,
 
@@ -24,8 +27,8 @@ pub(crate) struct TokenRule<'a> {
     pub(crate) name: &'a str,
     pub(crate) name_span: Range<usize>,
     pub(crate) ast: RegexAst<'a>,
-    /// The optional Rust code block (escape hatch) for context-sensitive evaluation.
-    pub(crate) action: Option<&'a str>,
+    /// The path to Rust callback for context-sensitive evaluation.
+    pub(crate) callback: Option<&'a str>,
     pub(crate) skip: bool,
     pub(crate) full_span: Range<usize>,
 }

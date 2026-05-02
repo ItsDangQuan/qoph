@@ -11,6 +11,7 @@ pub(crate) struct RuleParser<'a> {
     peeked: Option<(Token, Range<usize>)>,
     fragments: Vec<FragmentRule<'a>>,
     rules: Vec<TokenRule<'a>>,
+    state_type: Option<&'a str>,
     pub(crate) diag: Vec<LexerCompilerDiag>,
 }
 
@@ -21,6 +22,7 @@ impl<'a> RuleParser<'a> {
             peeked: None,
             fragments: Vec::new(),
             rules: Vec::new(),
+            state_type: None,
             diag: Vec::new(),
         };
         parser.advance();
@@ -80,6 +82,18 @@ impl<'a> RuleParser<'a> {
             Ok(res)
         } else {
             self.report_unexpected("identifier");
+            Err(())
+        }
+    }
+
+    fn expect_path(&mut self) -> Result<(&'a str, Range<usize>), ()> {
+        if let Some((Token::Path, span)) = &self.peeked {
+            let slice = &self.lexer.source()[span.clone()];
+            let res = (slice, span.clone());
+            self.advance();
+            Ok(res)
+        } else {
+            self.report_unexpected("absolute module path");
             Err(())
         }
     }
@@ -153,6 +167,14 @@ impl<'a> RuleParser<'a> {
         Ok(())
     }
 
+    fn parse_state_decl(&mut self) -> Result<(), ()> {
+        self.advance();
+        let (path_slice, _) = self.expect_path()?;
+        self.expect_semi()?;
+        self.state_type = Some(path_slice);
+        Ok(())
+    }
+
     fn parse_rule_decl(&mut self, skip: bool, start_span: Range<usize>) -> Result<(), ()> {
         self.advance();
 
@@ -160,11 +182,11 @@ impl<'a> RuleParser<'a> {
         self.expect_assign()?;
         let (regex_slice, regex_span) = self.expect_raw_regex()?;
 
-        let mut action = None;
-        if let Some((Token::CodeBlock, span)) = &self.peeked {
-            let slice = &self.lexer.source()[span.clone()];
-            action = Some(Self::strip_raw_boundaries(slice).0);
+        let mut callback = None;
+        if let Some((Token::FatArrow, _)) = &self.peeked {
             self.advance();
+            let (path_slice, _) = self.expect_path()?;
+            callback = Some(path_slice);
         }
 
         let end_span = self.expect_semi()?;
@@ -179,7 +201,7 @@ impl<'a> RuleParser<'a> {
                 name,
                 name_span,
                 ast,
-                action,
+                callback,
                 skip,
                 full_span,
             }),
@@ -199,6 +221,12 @@ impl<'a> RuleParser<'a> {
     }
 
     pub(crate) fn parse(mut self) -> (Rule<'a>, Vec<LexerCompilerDiag>) {
+        if let Some((Token::StateKw, _)) = &self.peeked {
+            if self.parse_state_decl().is_err() {
+                self.synchronize();
+            }
+        }
+
         while let Some((peeked_token, _)) = &self.peeked {
             let res = match peeked_token {
                 Token::LetKw => self.parse_let_decl(),
@@ -231,6 +259,7 @@ impl<'a> RuleParser<'a> {
             Rule {
                 fragments: self.fragments,
                 rules: self.rules,
+                state_type: self.state_type,
             },
             self.diag,
         )
@@ -260,6 +289,6 @@ rule Ident = r"[a-zA-Z_][a-zA-Z0-9_]*" c#"Token::Ident"#;
         assert!(rule.rules[0].skip);
         assert_eq!(rule.rules[1].name, "Number");
         assert_eq!(rule.rules[2].name, "Ident");
-        assert_eq!(rule.rules[2].action, Some("Token::Ident"));
+        assert_eq!(rule.rules[2].callback, Some("Token::Ident"));
     }
 }

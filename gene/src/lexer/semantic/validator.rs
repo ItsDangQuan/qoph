@@ -16,6 +16,8 @@ pub(crate) struct SemanticValidator<'a> {
     pub(crate) fragments: HashMap<&'a str, FragmentRule<'a>>,
     /// The ordered sequence of token rules.
     pub(crate) rules: Vec<TokenRule<'a>>,
+    /// State type, pass down from parsing.
+    pub(crate) state_type: Option<&'a str>,
     /// Accumulated semantic diagnostics.
     pub(crate) dependencies: HashMap<&'a str, Vec<&'a str>>,
     pub(crate) diagnostics: Vec<LexerCompilerDiag>,
@@ -35,6 +37,7 @@ impl<'a> SemanticValidator<'a> {
         let mut validator = Self {
             fragments: HashMap::new(),
             rules: Vec::new(),
+            state_type: ast.state_type,
             dependencies: HashMap::new(),
             diagnostics: Vec::new(),
             options,
@@ -80,6 +83,7 @@ impl<'a> SemanticValidator<'a> {
         Ok(Rule {
             fragments: resolved_fragments.into_values().collect(),
             rules: self.rules,
+            state_type: self.state_type,
         })
     }
 
