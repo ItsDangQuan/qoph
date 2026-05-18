@@ -1,5 +1,5 @@
 #[rustfmt::skip]
-#[allow(dead_code)]
+#[allow(dead_code, unused)]
 mod generated {
 
 use std::collections::VecDeque;
@@ -186,48 +186,55 @@ impl<'a> Iterator for Lexer<'a> {
     type Item = Result<Token, ()>;
 
     fn next(&mut self) -> Option<Self::Item> {
-        if let Some(token) = self.buffer.pop_front() {
-            return Some(Ok(token));
-        }
-
-        if self.cursor >= self.input.len() {
-            return None;
-        }
-
-        let bytes = self.input.as_bytes();
-        self.token_start = self.cursor;
-
-        let mut current_state: u16 = 16;
-        let mut last_accept_state = None;
-        let mut last_accept_cursor = self.cursor;
-
-        while self.cursor < bytes.len() {
-            let byte = bytes[self.cursor];
-            let class_id = CLASS_MAP[byte as usize];
-            let next_state = TRANSITIONS[current_state as usize][class_id as usize];
-
-            if next_state == 0 {
-                break;
+        loop {
+            if let Some(token) = self.buffer.pop_front() {
+                return Some(Ok(token));
             }
 
-            current_state = next_state;
-            self.cursor += 1;
-
-            if let Some(rule_id) = ACCEPT[current_state as usize] {
-                last_accept_state = Some(rule_id);
-                last_accept_cursor = self.cursor;
+            if self.cursor >= self.input.len() {
+                return None;
             }
-        }
 
-        if let Some(rule_id) = last_accept_state {
-            self.cursor = last_accept_cursor;
+            let bytes = self.input.as_bytes();
+            self.token_start = self.cursor;
 
-            let slice = &self.input[self.token_start..self.cursor];
-            let remainder = &self.input[self.cursor..];
+            let mut current_state: u16 = 16;
+            let mut last_accept_state = None;
+            let mut last_accept_cursor = self.cursor;
 
-            let token = match rule_id {
-                0 => { return self.next(); },
-                1 => { return self.next(); },
+            while self.cursor < bytes.len() {
+                let byte = bytes[self.cursor];
+                let class_id = CLASS_MAP[byte as usize];
+                let next_state = TRANSITIONS[current_state as usize][class_id as usize];
+
+                if next_state == 0 {
+                    break;
+                }
+
+                current_state = next_state;
+                self.cursor += 1;
+
+                if let Some(rule_id) = ACCEPT[current_state as usize] {
+                    last_accept_state = Some(rule_id);
+                    last_accept_cursor = self.cursor;
+                }
+            }
+
+            if let Some(rule_id) = last_accept_state {
+                self.cursor = last_accept_cursor;
+
+                if self.cursor == self.token_start {
+                    let next_char = self.input[self.token_start..].chars().next().unwrap();
+                    self.cursor = self.token_start + next_char.len_utf8();
+                    return Some(Err(()));
+                }
+
+                let slice = &self.input[self.token_start..self.cursor];
+                let remainder = &self.input[self.cursor..];
+
+                let token = match rule_id {
+                0 => continue,
+                1 => continue,
                 2 => Token::StateKw,
                 3 => Token::LetKw,
                 4 => Token::RuleKw,
@@ -249,11 +256,12 @@ impl<'a> Iterator for Lexer<'a> {
                 _ => unreachable!(),
             };
 
-            Some(Ok(token))
-        } else {
-            let next_char = self.input[self.token_start..].chars().next().unwrap();
-            self.cursor = self.token_start + next_char.len_utf8();
-            Some(Err(()))
+                return Some(Ok(token));
+            } else {
+                let next_char = self.input[self.token_start..].chars().next().unwrap();
+                self.cursor = self.token_start + next_char.len_utf8();
+                return Some(Err(()));
+            }
         }
     }
 }

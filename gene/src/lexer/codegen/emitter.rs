@@ -109,10 +109,7 @@ impl<'a> CodeEmitter<'a> {
         let mut out = String::new();
         for (id, rule) in self.rule.rules.iter().enumerate() {
             if rule.skip {
-                out.push_str(&format!(
-                    "                {} => {{ return self.next(); }},\n",
-                    id
-                ));
+                out.push_str(&format!("                {} => continue,\n", id));
             } else if let Some(callback_path) = rule.callback {
                 let callback = template::CALLBACK.replace("{CALLBACK_PATH}", callback_path);
                 out.push_str(&format!("                {} => {{", id));
