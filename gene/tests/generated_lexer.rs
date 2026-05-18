@@ -198,3 +198,31 @@ fn generated_lexer_executes_actions() {
 
     compile_and_run(spec, top_level, main_body);
 }
+
+#[test]
+fn generated_lexer_handles_unicode_in_definition() {
+    let spec = r#"
+        rule Accent = r"é+";
+    "#;
+
+    let main_body = r#"
+        use generated::{Lexer, Token};
+        let input = "éé";
+        let mut lexer = Lexer::new(input);
+        let mut tokens = Vec::new();
+
+        while let Some(item) = lexer.next() {
+            match item {
+                Ok(tok) => tokens.push(tok),
+                Err(()) => std::process::exit(2),
+            }
+        }
+
+        if tokens != vec![Token::Accent] {
+            eprintln!("unexpected tokens: {:?}", tokens);
+            std::process::exit(1);
+        }
+    "#;
+
+    compile_and_run(spec, "", main_body);
+}
